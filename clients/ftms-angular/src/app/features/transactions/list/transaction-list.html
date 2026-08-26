@@ -1,0 +1,136 @@
+<section class="transactions">
+  <header class="transactions__header">
+    <div>
+      <h1 class="transactions__title">Transactions</h1>
+      <p class="transactions__subtitle">
+        A record of every transaction. Nothing is ever deleted, only archived.
+      </p>
+    </div>
+
+    <a class="button button--primary" routerLink="/transactions/new">Capture transaction</a>
+  </header>
+
+  <div class="transactions__filters">
+    <label class="field">
+      <span class="field__label">Status</span>
+      <select class="field__control" [formControl]="statusFilter">
+        @for (name of statuses.names(); track name) {
+          <option [value]="name">{{ name }}</option>
+        }
+      </select>
+    </label>
+
+    <label class="field">
+      <span class="field__label">Rows per page</span>
+      <select
+        class="field__control"
+        [value]="store.pageSize()"
+        (change)="store.setPageSize(+$any($event.target).value)"
+      >
+        <option [value]="25">25</option>
+        <option [value]="50">50</option>
+        <option [value]="100">100</option>
+        <option [value]="200">200</option>
+      </select>
+    </label>
+
+    @if (store.isLoading()) {
+      <span class="transactions__loading" role="status">Loading…</span>
+    }
+  </div>
+
+  <div class="transactions__table-wrap">
+    <table class="table">
+      <thead>
+        <tr>
+          @for (field of sortableFields; track field) {
+            <th scope="col">
+              <button type="button" class="table__sort" (click)="changeSort(field)">
+                {{ field }}
+                @if (store.currentQuery().sortBy === field) {
+                  <span aria-hidden="true">{{ store.currentQuery().sortDir === 'desc' ? '▼' : '▲' }}</span>
+                }
+              </button>
+            </th>
+          }
+          <th scope="col">Status</th>
+          <th scope="col"><span class="visually-hidden">Actions</span></th>
+        </tr>
+      </thead>
+
+      <tbody>
+        @for (transaction of store.transactions(); track trackById($index, transaction)) {
+          <tr>
+            <td>{{ transaction.transactionDate | date: 'yyyy-MM-dd HH:mm' : 'UTC' }}</td>
+            <td class="table__amount">
+              {{ transaction.currencyCode }} {{ transaction.amount | number: '1.2-2' }}
+            </td>
+            <td>{{ transaction.createdAtUtc | date: 'yyyy-MM-dd' : 'UTC' }}</td>
+            <td>{{ transaction.transactionType }}</td>
+            <td><ftms-status-badge [status]="transaction.status" /></td>
+            <td class="table__actions">
+              <!--
+                View is always offered: get by id returns a transaction in any status, because
+                that endpoint is the audit window (doc 05 section 4).
+
+                Edit and Archive are not. Completed, Cancelled and Inactive records are history
+                (doc 05 section 6), so Edit would earn a 409 and Archive would be a no op.
+                Offering a control that always fails teaches users to distrust the screen.
+              -->
+              <a class="button button--link" [routerLink]="['/transactions', transaction.id]">View</a>
+
+              @if (isWorking(transaction.status)) {
+                <a class="button button--link" [routerLink]="['/transactions', transaction.id, 'edit']">
+                  Edit
+                </a>
+              }
+
+              @if (transaction.status !== 'Inactive') {
+                <button type="button" class="button button--danger-link" (click)="askToArchive(transaction)">
+                  Archive
+                </button>
+              }
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td class="table__empty" colspan="6">
+              @if (store.isLoading()) {
+                Loading transactions…
+              } @else {
+                No {{ store.status() | lowercase }} transactions yet.
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <ftms-paging
+    [page]="store.page()"
+    [pageSize]="store.pageSize()"
+    [totalCount]="store.totalCount()"
+    [disabled]="store.isLoading()"
+    (pageChange)="store.goToPage($event)"
+  />
+</section>
+
+@if (pendingArchive(); as target) {
+  <ftms-confirm-dialog
+    title="Archive this transaction?"
+    [message]="
+      'This moves the ' +
+      target.transactionType +
+      ' of ' +
+      target.currencyCode +
+      ' ' +
+      target.amount +
+      ' to Inactive. The record is kept for audit, but it cannot be reactivated from here.'
+    "
+    confirmLabel="Archive"
+    [busy]="archiving()"
+    (confirmed)="confirmArchive()"
+    (cancelled)="cancelArchive()"
+  />
+}

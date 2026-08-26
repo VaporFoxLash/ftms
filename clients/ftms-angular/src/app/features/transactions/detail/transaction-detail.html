@@ -1,0 +1,55 @@
+<section class="detail">
+  <header class="detail__header">
+    <h1 class="detail__title">Transaction</h1>
+    <a class="button button--link" routerLink="/transactions">Back to list</a>
+  </header>
+
+  @if (loading()) {
+    <p role="status">Loading…</p>
+  } @else if (transaction(); as tx) {
+    <dl class="detail__grid">
+      <dt>Status</dt>
+      <dd><ftms-status-badge [status]="tx.status" /></dd>
+
+      <dt>Amount</dt>
+      <dd class="detail__amount">{{ tx.currencyCode }} {{ tx.amount | number: '1.2-2' }}</dd>
+
+      <dt>Type</dt>
+      <dd>{{ tx.transactionType }}</dd>
+
+      <dt>Transaction date</dt>
+      <dd>{{ tx.transactionDate | date: 'yyyy-MM-dd HH:mm:ss' : 'UTC' }} UTC</dd>
+
+      <dt>Created</dt>
+      <dd>{{ tx.createdAtUtc | date: 'yyyy-MM-dd HH:mm:ss' : 'UTC' }} UTC</dd>
+
+      <dt>Last modified</dt>
+      <dd>
+        @if (tx.modifiedAtUtc) {
+          {{ tx.modifiedAtUtc | date: 'yyyy-MM-dd HH:mm:ss' : 'UTC' }} UTC
+        } @else {
+          Never changed since capture
+        }
+      </dd>
+
+      <dt>Identifier</dt>
+      <dd><code>{{ tx.id }}</code></dd>
+
+      <dt>
+        Version
+        <span class="detail__hint">Concurrency token sent as If-Match on edit</span>
+      </dt>
+      <dd><code>{{ etag() }}</code></dd>
+    </dl>
+
+    @if (tx.status === 'Active' || tx.status === 'Pending') {
+      <a class="button button--primary" [routerLink]="['/transactions', tx.id, 'edit']">Edit</a>
+    } @else {
+      <p class="detail__note">
+        This transaction is {{ tx.status }} and is kept as history. It cannot be edited.
+      </p>
+    }
+  } @else {
+    <p role="alert">That transaction could not be found.</p>
+  }
+</section>

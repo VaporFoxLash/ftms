@@ -31,8 +31,11 @@ test-results/
 blob-report/
 .playwright/
 
-# Generated API client (regenerated from the running API's OpenAPI document)
-clients/ftms-angular/src/app/core/api/generated/
+# The generated API client is deliberately COMMITTED, not ignored.
+# design: doc 05 section 9 and doc 10 section 2 - OpenAPI is the contract both clients generate
+# against, and a committed snapshot means CI builds the frontend without a running backend,
+# while a contract change shows up as a reviewable diff in the pull request that caused it.
+# Regenerate with: npm run generate:api
 
 # Local secrets and environment
 *.env

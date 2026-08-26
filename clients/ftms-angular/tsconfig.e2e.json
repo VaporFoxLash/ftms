@@ -1,0 +1,11 @@
+/* Playwright journeys live outside src/, so neither the app nor the unit test tsconfig covers
+   them. Without this file they would go entirely unchecked. */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "module": "esnext",
+    "moduleResolution": "bundler"
+  },
+  "include": ["e2e/**/*.ts", "playwright.config.ts"]
+}

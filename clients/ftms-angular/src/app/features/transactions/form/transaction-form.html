@@ -1,0 +1,113 @@
+<section class="form-page">
+  <header class="form-page__header">
+    <h1 class="form-page__title">
+      {{ isEdit() ? 'Edit transaction' : 'Capture transaction' }}
+    </h1>
+    <a class="button button--link" routerLink="/transactions">Back to list</a>
+  </header>
+
+  @if (loading()) {
+    <p class="form-page__loading" role="status">Loading transaction…</p>
+  } @else {
+    @if (isEdit() && !isEditable()) {
+      <p class="notice notice--warning" role="alert">
+        This transaction is <strong>{{ status() }}</strong>. Completed, cancelled and archived
+        records are history and cannot be edited. Capture a new transaction instead.
+      </p>
+    }
+
+    <form class="form" [formGroup]="form" (ngSubmit)="save()" novalidate>
+      <label class="field">
+        <span class="field__label">Transaction date</span>
+        <input class="field__control" type="datetime-local" formControlName="transactionDate" />
+        @if (form.controls.transactionDate.touched && form.controls.transactionDate.errors; as errors) {
+          <span class="field__error">
+            @if (errors['required']) {
+              A transaction date is required.
+            } @else if (errors['server']) {
+              {{ errors['server'] }}
+            }
+          </span>
+        }
+      </label>
+
+      <label class="field">
+        <span class="field__label">Type</span>
+        <select class="field__control" formControlName="transactionType">
+          @for (type of types; track type) {
+            <option [value]="type">{{ type }}</option>
+          }
+        </select>
+        @if (form.controls.transactionType.touched && form.controls.transactionType.errors; as errors) {
+          <span class="field__error">{{ errors['server'] ?? 'Choose a transaction type.' }}</span>
+        }
+      </label>
+
+      <label class="field">
+        <span class="field__label">
+          Amount
+          @if (isEdit()) {
+            <span class="field__hint">Amount cannot be changed after capture</span>
+          }
+        </span>
+        <input
+          class="field__control"
+          type="number"
+          step="0.01"
+          min="0.01"
+          inputmode="decimal"
+          formControlName="amount"
+        />
+        @if (form.controls.amount.touched && form.controls.amount.errors; as errors) {
+          <span class="field__error">
+            @if (errors['required']) {
+              An amount is required.
+            } @else if (errors['min']) {
+              Amount must be greater than zero.
+            } @else if (errors['twoDecimalPlaces']) {
+              Amount can have at most two decimal places.
+            } @else if (errors['server']) {
+              {{ errors['server'] }}
+            }
+          </span>
+        }
+      </label>
+
+      <label class="field">
+        <span class="field__label">
+          Currency
+          @if (isEdit()) {
+            <span class="field__hint">Currency cannot be changed after capture</span>
+          }
+        </span>
+        <input
+          class="field__control field__control--short"
+          type="text"
+          maxlength="3"
+          autocomplete="off"
+          formControlName="currencyCode"
+        />
+        @if (form.controls.currencyCode.touched && form.controls.currencyCode.errors; as errors) {
+          <span class="field__error">
+            @if (errors['server']) {
+              {{ errors['server'] }}
+            } @else {
+              Use a three letter ISO code, for example ZAR.
+            }
+          </span>
+        }
+      </label>
+
+      <div class="form__actions">
+        <a class="button" routerLink="/transactions">Cancel</a>
+        <button
+          class="button button--primary"
+          type="submit"
+          [disabled]="saving() || !isEditable()"
+        >
+          {{ saving() ? 'Saving…' : isEdit() ? 'Save changes' : 'Capture' }}
+        </button>
+      </div>
+    </form>
+  }
+</section>

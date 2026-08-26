@@ -1,4 +1,4 @@
-using FTMS.Api.Authentication;
+﻿using FTMS.Api.Authentication;
 using FTMS.Api.Contracts;
 using FTMS.Api.Middleware;
 using FTMS.Application.Abstractions;
@@ -33,7 +33,7 @@ public sealed class TransactionsController(IDispatcher dispatcher) : ApiControll
     /// The paged list. Called bare it behaves exactly as the brief demands and returns active
     /// transactions only. design: doc 05 section 3.
     /// </summary>
-    [HttpGet]
+    [HttpGet(Name = RouteNames.ListTransactions)]
     [ProducesResponseType<PagedResult<TransactionDto>>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> List(
@@ -56,11 +56,16 @@ public sealed class TransactionsController(IDispatcher dispatcher) : ApiControll
     /// window. Sets an ETag from the RowVersion and honours If-None-Match with 304.
     /// design: doc 05 section 4 and doc 07 section 4.
     /// </summary>
-    [HttpGet("{id:guid}", Name = nameof(GetById))]
+    [HttpGet("{id:guid}", Name = RouteNames.GetTransactionById)]
     [ProducesResponseType<TransactionDto>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status304NotModified)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetById(
+        Guid id,
+        // Declared as a parameter rather than read off Request.Headers so it appears in the
+        // OpenAPI document and therefore in both generated clients. design: doc 05 section 9.
+        [FromHeader(Name = "If-None-Match")] string? ifNoneMatch,
+        CancellationToken cancellationToken)
     {
         var result = await dispatcher.Ask(new GetTransactionByIdQuery(id), cancellationToken);
 
@@ -73,7 +78,6 @@ public sealed class TransactionsController(IDispatcher dispatcher) : ApiControll
 
         // Client side caching for free: the response says when nothing changed and the body
         // never travels. design: doc 07 section 4.
-        var ifNoneMatch = Request.Headers[HeaderNames.IfNoneMatch].ToString();
         if (!string.IsNullOrEmpty(ifNoneMatch) && ifNoneMatch.Split(',').Any(
                 candidate => candidate.Trim() == detail.ETag))
         {
@@ -87,7 +91,7 @@ public sealed class TransactionsController(IDispatcher dispatcher) : ApiControll
     }
 
     /// <summary>design: doc 05 section 5 - 201 with a Location header and the created resource.</summary>
-    [HttpPost]
+    [HttpPost(Name = RouteNames.CreateTransaction)]
     [Authorize(Policy = AuthorizationPolicies.WriteTransactions)]
     [ProducesResponseType<TransactionDto>(StatusCodes.Status201Created)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -122,8 +126,10 @@ public sealed class TransactionsController(IDispatcher dispatcher) : ApiControll
 
         Response.Headers[HeaderNames.ETag] = fetched.Value.ETag;
 
+        // The route NAME, not the method name. They differ deliberately: the name is also the
+        // OpenAPI operationId, and it is what the generated Angular client's method is called.
         return CreatedAtRoute(
-            nameof(GetById),
+            RouteNames.GetTransactionById,
             new { id = created.Value },
             fetched.Value.Transaction);
     }
@@ -133,7 +139,7 @@ public sealed class TransactionsController(IDispatcher dispatcher) : ApiControll
     /// Silent last writer wins is not acceptable on financial records.
     /// design: doc 05 section 6 and decision 4.
     /// </summary>
-    [HttpPut("{id:guid}")]
+    [HttpPut("{id:guid}", Name = RouteNames.UpdateTransaction)]
     [Authorize(Policy = AuthorizationPolicies.WriteTransactions)]
     [ProducesResponseType<TransactionDto>(StatusCodes.Status200OK)]
     [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
@@ -143,11 +149,13 @@ public sealed class TransactionsController(IDispatcher dispatcher) : ApiControll
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status428PreconditionRequired)]
     public async Task<IActionResult> Update(
         Guid id,
+        // A required precondition belongs in the contract, not in a comment. Declaring it here
+        // puts If-Match in the OpenAPI document, so the generated Angular and WPF clients both
+        // have a parameter for it and cannot forget to send one. design: doc 05 section 9.
+        [FromHeader(Name = "If-Match")] string? ifMatch,
         [FromBody] UpdateTransactionRequest request,
         CancellationToken cancellationToken)
     {
-        var ifMatch = Request.Headers[HeaderNames.IfMatch].ToString();
-
         if (string.IsNullOrWhiteSpace(ifMatch))
         {
             return PreconditionRequired();
@@ -185,7 +193,7 @@ public sealed class TransactionsController(IDispatcher dispatcher) : ApiControll
     /// returns 204 rather than an error, which is what clients and retry logic want. 404 only
     /// when the id has never existed. design: doc 05 section 7 and decision 6.
     /// </summary>
-    [HttpDelete("{id:guid}")]
+    [HttpDelete("{id:guid}", Name = RouteNames.DeleteTransaction)]
     [Authorize(Policy = AuthorizationPolicies.DeleteTransactions)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
@@ -221,3 +229,5 @@ public sealed class TransactionsController(IDispatcher dispatcher) : ApiControll
         };
     }
 }
+
+

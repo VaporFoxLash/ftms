@@ -1,0 +1,59 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgb(15 23 42 / 45%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.dialog {
+  background: #fff;
+  border-radius: 10px;
+  padding: 1.5rem;
+  max-width: 30rem;
+  width: calc(100% - 2rem);
+  box-shadow: 0 20px 45px rgb(15 23 42 / 25%);
+}
+
+.dialog__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.dialog__body {
+  margin: 0 0 1.25rem;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.dialog__cancel,
+.dialog__confirm {
+  padding: 0.45rem 1rem;
+  border-radius: 6px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.dialog__cancel {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+}
+
+.dialog__confirm {
+  border: 1px solid #b91c1c;
+  background: #dc2626;
+  color: #fff;
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}

@@ -1,0 +1,112 @@
+:root {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  color: #0f172a;
+  background: #f8fafc;
+  line-height: 1.45;
+}
+
+// Shared form and button primitives, used by every feature so a field looks the same
+// wherever it appears.
+.field {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.field__label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.field__hint {
+  display: block;
+  font-weight: 400;
+  font-size: 0.78rem;
+  color: #94a3b8;
+}
+
+.field__control {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font: inherit;
+  background: #fff;
+
+  &:focus-visible {
+    outline: 2px solid #1d4ed8;
+    outline-offset: 1px;
+  }
+
+  &:disabled {
+    background: #f1f5f9;
+    color: #64748b;
+  }
+}
+
+.field__control--short {
+  max-width: 8rem;
+  text-transform: uppercase;
+}
+
+.field__error {
+  font-size: 0.8rem;
+  color: #b91c1c;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+.button--primary {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #fff;
+}
+
+.button--link {
+  border-color: transparent;
+  background: none;
+  color: #1d4ed8;
+  padding-inline: 0.2rem;
+}
+
+.button--danger-link {
+  border-color: transparent;
+  background: none;
+  color: #b91c1c;
+  padding-inline: 0.2rem;
+}

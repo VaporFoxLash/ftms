@@ -1,0 +1,135 @@
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: #1e293b;
+  color: #fff;
+  padding: 0.5rem 1rem;
+  z-index: 100;
+
+  &:focus {
+    left: 0;
+  }
+}
+
+.shell__header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.85rem 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fff;
+}
+
+.shell__brand {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  text-decoration: none;
+  color: inherit;
+}
+
+.shell__brand-mark {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #1d4ed8;
+}
+
+.shell__brand-name {
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.shell__nav {
+  display: flex;
+  gap: 1rem;
+  flex: 1;
+
+  a {
+    color: #334155;
+    text-decoration: none;
+    padding: 0.25rem 0;
+    border-bottom: 2px solid transparent;
+
+    &.is-active {
+      border-bottom-color: #1d4ed8;
+      color: #1d4ed8;
+    }
+  }
+}
+
+.shell__account {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.shell__user {
+  font-size: 0.9rem;
+  color: #475569;
+}
+
+.shell__main {
+  padding: 1.75rem 1.5rem 3rem;
+  max-width: 72rem;
+  margin: 0 auto;
+}
+
+.toasts {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  display: grid;
+  gap: 0.6rem;
+  max-width: min(26rem, calc(100vw - 2rem));
+  z-index: 60;
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid;
+  box-shadow: 0 10px 25px rgb(15 23 42 / 12%);
+  background: #fff;
+}
+
+.toast__body {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.toast__message {
+  font-size: 0.92rem;
+}
+
+.toast__detail {
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.toast__close {
+  border: none;
+  background: none;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #64748b;
+}
+
+.toast--error {
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+.toast--success {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.toast--info {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}

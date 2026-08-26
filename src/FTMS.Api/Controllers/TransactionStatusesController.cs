@@ -1,4 +1,4 @@
-using FTMS.Api.Authentication;
+﻿using FTMS.Api.Authentication;
 using FTMS.Application.Abstractions;
 using FTMS.Application.TransactionStatuses;
 using FTMS.Application.TransactionStatuses.Queries.GetTransactionStatuses;
@@ -18,7 +18,7 @@ public sealed class TransactionStatusesController(IDispatcher dispatcher) : ApiC
     /// makes this the perfect cache warm up call for clients. Served from the 24 hour cache,
     /// so after the first hit it costs no database round trip.
     /// </summary>
-    [HttpGet]
+    [HttpGet(Name = RouteNames.ListTransactionStatuses)]
     [ProducesResponseType<IReadOnlyList<TransactionStatusDto>>(StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken)
     {
@@ -27,3 +27,5 @@ public sealed class TransactionStatusesController(IDispatcher dispatcher) : ApiC
         return result.IsSuccess ? Ok(result.Value) : Problem(result.Error);
     }
 }
+
+

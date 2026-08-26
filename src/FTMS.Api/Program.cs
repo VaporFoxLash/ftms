@@ -36,7 +36,8 @@ builder.Services
 
 // design: doc 05 section 9 - OpenAPI is the single client facing contract; both clients
 // generate their API layers from it, so neither hand writes DTOs that can drift.
-builder.Services.AddOpenApi("v1");
+builder.Services.AddOpenApi("v1", options =>
+    options.AddSchemaTransformer<DecimalSchemaTransformer>());
 
 builder.Services.AddProblemDetails();
 

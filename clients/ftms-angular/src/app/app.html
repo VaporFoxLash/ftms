@@ -1,0 +1,47 @@
+<a class="skip-link" href="#main">Skip to content</a>
+
+<header class="shell__header">
+  <a class="shell__brand" routerLink="/transactions">
+    <span class="shell__brand-mark">FTMS</span>
+    <span class="shell__brand-name">Financial Transactions</span>
+  </a>
+
+  <nav class="shell__nav" aria-label="Main">
+    @if (auth.isAuthenticated()) {
+      <a routerLink="/transactions" routerLinkActive="is-active">Transactions</a>
+    }
+  </nav>
+
+  <div class="shell__account">
+    @if (auth.isAuthenticated()) {
+      <span class="shell__user">{{ auth.userName() }}</span>
+      <button type="button" class="button button--link" (click)="signOut()">Sign out</button>
+    } @else {
+      <a class="button button--link" routerLink="/auth/login">Sign in</a>
+    }
+  </div>
+</header>
+
+<main id="main" class="shell__main">
+  <router-outlet />
+</main>
+
+<!--
+  Toasts live at the shell level so any route can raise one, and the error interceptor can
+  report a failure without knowing which screen was showing. design: doc 05 section 1.
+-->
+<div class="toasts" aria-live="polite" aria-atomic="false">
+  @for (toast of toasts.toasts(); track toast.id) {
+    <div class="toast" [class]="'toast--' + toast.level" role="status">
+      <div class="toast__body">
+        <strong class="toast__message">{{ toast.message }}</strong>
+        @if (toast.detail) {
+          <span class="toast__detail">{{ toast.detail }}</span>
+        }
+      </div>
+      <button type="button" class="toast__close" aria-label="Dismiss" (click)="toasts.dismiss(toast.id)">
+        ×
+      </button>
+    </div>
+  }
+</div>
