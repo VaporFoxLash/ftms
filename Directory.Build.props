@@ -9,7 +9,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningLevel>9999</WarningLevel>
-    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Invariant globalization is deliberately NOT enabled: Microsoft.Data.SqlClient refuses
+         to run under it. FTMS also formats money and dates for South African users, so full
+         ICU data is the right default anyway. -->
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <IsPackable>false</IsPackable>
   </PropertyGroup>

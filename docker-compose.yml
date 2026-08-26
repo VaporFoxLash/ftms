@@ -1,0 +1,37 @@
+# SQL Server for developers not on Windows, where LocalDB does not exist.
+#
+# Windows developers do not need this: appsettings points at (localdb)\MSSQLLocalDB and the
+# migration applies on startup in Development.
+#
+# design: doc 07 section 2 - production runs SQL Server Express, whose limits (10 GB, four
+# cores, ~1.4 GB buffer pool) are treated as design inputs rather than surprises. This image is
+# the Developer edition, which is feature complete and free for non production use, so ledger
+# tables and everything else in doc 06 behave here the way they will in production.
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: ftms-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Ftms_Local_Dev_1"
+      MSSQL_PID: "Developer"
+    ports:
+      - "1433:1433"
+    volumes:
+      - ftms-sqldata:/var/opt/mssql
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  ftms-sqldata:
+# Connection string for this container:
+#   Server=localhost,1433;Database=Ftms;User Id=sa;Password=Ftms_Local_Dev_1;TrustServerCertificate=True
+# Put it in appsettings.Local.json (gitignored) or the FTMS_DESIGNTIME_CONNECTION variable.
