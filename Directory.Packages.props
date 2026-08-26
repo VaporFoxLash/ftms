@@ -38,6 +38,12 @@
     <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="$(MicrosoftVersion)" />
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="$(MicrosoftVersion)" />
     <PackageVersion Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.2.3" />
+    <!-- Transitive pin. Microsoft.AspNetCore.OpenApi 10.0.8 resolves Microsoft.OpenApi 2.0.0,
+         which carries GHSA-v5pm-xwqc-g5wc (high severity). CentralPackageTransitivePinningEnabled
+         lets us lift it without waiting for the parent package to move.
+         design: doc 08 section 7.1 - the dependency vulnerability audit is a CI gate, and here
+         warnings-as-errors caught it at compile time instead. -->
+    <PackageVersion Include="Microsoft.OpenApi" Version="2.12.2" />
   </ItemGroup>
 
   <ItemGroup Label="Testing">

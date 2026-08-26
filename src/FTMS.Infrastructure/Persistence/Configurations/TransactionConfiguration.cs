@@ -35,6 +35,7 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
 
         builder.Property(transaction => transaction.TransactionDate)
             .HasColumnType("datetime2(3)")
+            .HasConversion(UtcDateTimeConverters.Utc)
             .IsRequired();
 
         // design: doc 02 section 1.5 - the column stays NVARCHAR(50) exactly as the brief
@@ -81,10 +82,12 @@ internal sealed class TransactionConfiguration : IEntityTypeConfiguration<Transa
 
         builder.Property(transaction => transaction.CreatedAtUtc)
             .HasColumnType("datetime2(3)")
+            .HasConversion(UtcDateTimeConverters.Utc)
             .IsRequired();
 
         builder.Property(transaction => transaction.ModifiedAtUtc)
-            .HasColumnType("datetime2(3)");
+            .HasColumnType("datetime2(3)")
+            .HasConversion(UtcDateTimeConverters.NullableUtc);
 
         // design: doc 02 section 1.8 - optimistic concurrency, surfaced to clients as an ETag.
         builder.Property(transaction => transaction.RowVersion)

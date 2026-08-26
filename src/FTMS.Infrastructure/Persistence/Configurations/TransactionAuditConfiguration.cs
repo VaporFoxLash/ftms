@@ -31,6 +31,7 @@ internal sealed class TransactionAuditConfiguration : IEntityTypeConfiguration<T
 
         builder.Property(audit => audit.ChangedAtUtc)
             .HasColumnType("datetime2(3)")
+            .HasConversion(UtcDateTimeConverters.Utc)
             .IsRequired();
 
         builder.HasOne<Transaction>()

@@ -2,6 +2,13 @@
 
   <!-- Composition root only. design: doc 03 -->
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" />
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\FTMS.Application\FTMS.Application.csproj" />
     <ProjectReference Include="..\FTMS.Infrastructure\FTMS.Infrastructure.csproj" />
   </ItemGroup>

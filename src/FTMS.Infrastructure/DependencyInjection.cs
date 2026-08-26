@@ -29,8 +29,17 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException(
                 $"Connection string '{ConnectionStringName}' is not configured.");
 
-        services.AddScoped<ICurrentUser, SystemCurrentUser>();
-        services.AddScoped<AuditSaveChangesInterceptor>();
+        // Both are singletons, and that is forced by AddDbContextPool below rather than chosen
+        // for its own sake. A pooled DbContext reuses one DbContextOptions instance across
+        // every request, so EF builds those options from the ROOT provider and simply cannot
+        // resolve a scoped interceptor.
+        //
+        // Per request identity survives anyway: the API's ICurrentUser reads
+        // IHttpContextAccessor, which is backed by AsyncLocal, so a singleton still sees the
+        // current request's principal. That is precisely what the accessor exists for.
+        // design: doc 07 section 4 (pooling) and doc 02 section 1.7 (ChangedBy).
+        services.AddSingleton<ICurrentUser, SystemCurrentUser>();
+        services.AddSingleton<AuditSaveChangesInterceptor>();
 
         // design: doc 07 section 4 - DbContext pooling, because creating a context per request
         // is measurable overhead on a machine limited to the four cores Express is allowed.
