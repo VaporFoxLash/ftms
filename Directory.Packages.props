@@ -57,6 +57,10 @@
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="$(MicrosoftVersion)" />
     <PackageVersion Include="Testcontainers.MsSql" Version="4.14.0" />
     <PackageVersion Include="Respawn" Version="7.0.0" />
+    <!-- Lets a machine without Docker report the Testcontainers suite as SKIPPED rather than
+         FAILED. The doc 08 decision that integration tests use real SQL Server is unchanged;
+         CI always has Docker and always runs them for real. -->
+    <PackageVersion Include="Xunit.SkippableFact" Version="1.5.85" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="$(MicrosoftVersion)" />
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="$(MicrosoftVersion)" />
   </ItemGroup>
