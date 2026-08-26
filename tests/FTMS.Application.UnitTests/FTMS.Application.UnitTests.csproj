@@ -1,5 +1,14 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- Handlers depend only on interfaces, so they test without a database. design: doc 08 section 1 -->
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" />
+    <!-- The dispatcher tests build a real container, so they need the DI implementation and a
+         logger factory, not just the abstractions the Application layer compiles against. -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\..\src\FTMS.Application\FTMS.Application.csproj" />
   </ItemGroup>

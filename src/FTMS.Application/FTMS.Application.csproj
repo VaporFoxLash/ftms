@@ -3,8 +3,23 @@
   <!-- Defines what it needs (repository interfaces, ICacheService); Infrastructure supplies it.
        Never references Infrastructure. design: doc 03 -->
   <ItemGroup>
+    <PackageReference Include="FluentValidation" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Scrutor" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\FTMS.Domain\FTMS.Domain.csproj" />
     <ProjectReference Include="..\FTMS.SharedKernel\FTMS.SharedKernel.csproj" />
+  </ItemGroup>
+
+  <!-- Handlers and validators are internal: they are implementation detail reachable only
+       through IDispatcher, so nothing outside this assembly can bypass the decorator
+       pipeline by resolving a handler directly. Unit tests are the one legitimate exception. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="FTMS.Application.UnitTests" />
   </ItemGroup>
 
 </Project>
