@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The domain knows nothing about databases, HTTP or caches. design: doc 03 -->
+  <ItemGroup>
+    <ProjectReference Include="..\FTMS.SharedKernel\FTMS.SharedKernel.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- design: doc 08, decision 4 - real SQL Server via Testcontainers, never SQLite. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Testcontainers.MsSql" />
+    <PackageReference Include="Respawn" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FTMS.Api\FTMS.Api.csproj" />
+    <ProjectReference Include="..\..\src\FTMS.Infrastructure\FTMS.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

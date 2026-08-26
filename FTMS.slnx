@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/FTMS.Api/FTMS.Api.csproj" />
+    <Project Path="src/FTMS.Application/FTMS.Application.csproj" />
+    <Project Path="src/FTMS.Domain/FTMS.Domain.csproj" />
+    <Project Path="src/FTMS.Infrastructure/FTMS.Infrastructure.csproj" />
+    <Project Path="src/FTMS.SharedKernel/FTMS.SharedKernel.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FTMS.Api.IntegrationTests/FTMS.Api.IntegrationTests.csproj" />
+    <Project Path="tests/FTMS.Application.UnitTests/FTMS.Application.UnitTests.csproj" />
+    <Project Path="tests/FTMS.ArchitectureTests/FTMS.ArchitectureTests.csproj" />
+    <Project Path="tests/FTMS.Domain.UnitTests/FTMS.Domain.UnitTests.csproj" />
+  </Folder>
+</Solution>

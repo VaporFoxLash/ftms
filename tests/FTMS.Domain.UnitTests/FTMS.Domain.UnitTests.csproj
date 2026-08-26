@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FTMS.Domain\FTMS.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

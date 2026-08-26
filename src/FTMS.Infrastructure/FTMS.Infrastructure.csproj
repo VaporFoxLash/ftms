@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Owns persistence, caching and the audit interceptor. design: doc 03 -->
+  <ItemGroup>
+    <ProjectReference Include="..\FTMS.Application\FTMS.Application.csproj" />
+    <ProjectReference Include="..\FTMS.Domain\FTMS.Domain.csproj" />
+    <ProjectReference Include="..\FTMS.SharedKernel\FTMS.SharedKernel.csproj" />
+  </ItemGroup>
+
+</Project>

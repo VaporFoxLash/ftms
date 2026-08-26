@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!-- Composition root only. design: doc 03 -->
+  <ItemGroup>
+    <ProjectReference Include="..\FTMS.Application\FTMS.Application.csproj" />
+    <ProjectReference Include="..\FTMS.Infrastructure\FTMS.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

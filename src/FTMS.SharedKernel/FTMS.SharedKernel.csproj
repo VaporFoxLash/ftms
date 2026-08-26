@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- References nothing. Everything may reference it, so it must stay stable. design: doc 03 -->
+
+</Project>

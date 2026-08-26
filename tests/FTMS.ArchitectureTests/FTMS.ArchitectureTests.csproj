@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- design: doc 03, decision 6 - the dependency rule as executable law in CI. -->
+  <ItemGroup>
+    <PackageReference Include="NetArchTest.Rules" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\FTMS.Api\FTMS.Api.csproj" />
+    <ProjectReference Include="..\..\src\FTMS.Application\FTMS.Application.csproj" />
+    <ProjectReference Include="..\..\src\FTMS.Domain\FTMS.Domain.csproj" />
+    <ProjectReference Include="..\..\src\FTMS.Infrastructure\FTMS.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\FTMS.SharedKernel\FTMS.SharedKernel.csproj" />
+  </ItemGroup>
+
+</Project>

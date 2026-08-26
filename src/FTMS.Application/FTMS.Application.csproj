@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Defines what it needs (repository interfaces, ICacheService); Infrastructure supplies it.
+       Never references Infrastructure. design: doc 03 -->
+  <ItemGroup>
+    <ProjectReference Include="..\FTMS.Domain\FTMS.Domain.csproj" />
+    <ProjectReference Include="..\FTMS.SharedKernel\FTMS.SharedKernel.csproj" />
+  </ItemGroup>
+
+</Project>
