@@ -29,10 +29,14 @@
 <!--
   Toasts live at the shell level so any route can raise one, and the error interceptor can
   report a failure without knowing which screen was showing. design: doc 05 section 1.
+
+  Deliberately NO aria-live here and no role="status" on the toasts: ToastService announces
+  through the CDK LiveAnnouncer instead. Keeping both would make screen readers read every
+  toast twice.
 -->
-<div class="toasts" aria-live="polite" aria-atomic="false">
+<div class="toasts">
   @for (toast of toasts.toasts(); track toast.id) {
-    <div class="toast" [class]="'toast--' + toast.level" role="status">
+    <div class="toast" [class]="'toast--' + toast.level">
       <div class="toast__body">
         <strong class="toast__message">{{ toast.message }}</strong>
         @if (toast.detail) {

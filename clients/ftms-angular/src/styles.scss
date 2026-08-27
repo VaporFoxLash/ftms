@@ -110,3 +110,24 @@ body {
   color: #b91c1c;
   padding-inline: 0.2rem;
 }
+
+// CDK overlay chrome. These have to be global rather than component scoped, because the CDK
+// renders the dialog into an overlay container outside the component's DOM, where its view
+// encapsulated styles cannot reach. The positioning itself comes from
+// @angular/cdk/overlay-prebuilt.css, wired up in angular.json.
+.ftms-dialog-panel {
+  background: #fff;
+  border-radius: 10px;
+  padding: 1.5rem;
+  max-width: 30rem;
+  width: calc(100vw - 2rem);
+  box-shadow: 0 20px 45px rgb(15 23 42 / 25%);
+
+  &:focus-visible {
+    outline: none;
+  }
+}
+
+.ftms-dialog-backdrop {
+  background: rgb(15 23 42 / 45%);
+}

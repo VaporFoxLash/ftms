@@ -18,3 +18,11 @@ docs/
 
 Code throughout the solution carries `// design: doc NN` comments pointing back to the
 chapter that decided the behaviour.
+
+## What is here now
+
+- [`architecture/adr/`](architecture/adr/) — architecture decision records. Design docs 01 to 10
+  captured the big decisions in narrative; from the start of building, day to day decisions get
+  one short MADR style record each (doc 10 §2).
+- `api/openapi-v1.json` — the committed contract snapshot both clients generate their API layer
+  from (doc 05 §9).

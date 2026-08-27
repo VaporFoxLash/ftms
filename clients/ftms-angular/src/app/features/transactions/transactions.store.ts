@@ -1,4 +1,8 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
+import {
+  TRANSACTION_LIST_PREFIX,
+  TransactionListCache,
+} from '../../core/caching/transaction-list-cache';
 import { Api } from '../../core/api/generated/api';
 import { createTransaction } from '../../core/api/generated/fn/transactions/create-transaction';
 import { deleteTransaction } from '../../core/api/generated/fn/transactions/delete-transaction';
@@ -47,6 +51,27 @@ export interface ListQuery {
 }
 
 /**
+ * tx:list:{status}:{page}:{pageSize}:{sortBy}:{sortDir}
+ *
+ * Byte for byte the shape CacheKeys.TransactionList builds in FTMS.Application. Keeping them
+ * identical is the point: it is what lets the client honour the same 45 second staleness window
+ * the server does, on the same slices of data. design: doc 07 sections 4 and 6.
+ */
+export function transactionListCacheKey(query: ListQuery): string {
+  return (
+    `${TRANSACTION_LIST_PREFIX}${query.status}:${query.page}:` +
+    `${query.pageSize}:${query.sortBy}:${query.sortDir}`
+  );
+}
+
+/** What the cache holds for a list query. */
+interface CachedPage {
+  readonly items: readonly TransactionDto[];
+  readonly totalCount: number;
+  readonly loadedAt: number;
+}
+
+/**
  * Page state for the transactions screen.
  *
  * design: doc 07 section 5 - the transactions screen is the hot path, so it gets OnPush change
@@ -59,10 +84,13 @@ export interface ListQuery {
 @Injectable()
 export class TransactionsStore {
   private readonly api = inject(Api);
+  private readonly cache = inject(TransactionListCache);
 
   private readonly rows = signal<readonly TransactionDto[]>([]);
   private readonly total = signal(0);
   private readonly busy = signal(false);
+  private readonly loadedAt = signal<number | null>(null);
+  private readonly fromCache = signal(false);
   private readonly query = signal<ListQuery>({
     // design: doc 05 section 3 - called bare the endpoint returns Active only, and the screen
     // opens on the same default so the two never disagree about what "the list" means.
@@ -78,6 +106,12 @@ export class TransactionsStore {
   readonly isLoading = this.busy.asReadonly();
   readonly currentQuery = this.query.asReadonly();
 
+  /** When the currently displayed rows were fetched from the API. Drives the freshness hint. */
+  readonly lastLoadedAt = this.loadedAt.asReadonly();
+
+  /** True when the last load() was answered from cache rather than the network. */
+  readonly servedFromCache = this.fromCache.asReadonly();
+
   readonly pageSize = computed(() => this.query().pageSize);
   readonly page = computed(() => this.query().page);
   readonly status = computed(() => this.query().status);
@@ -91,11 +125,30 @@ export class TransactionsStore {
   readonly hasNextPage = computed(() => this.query().page < this.totalPages());
   readonly isEmpty = computed(() => !this.busy() && this.rows().length === 0);
 
+  /**
+   * Loads the current query shape, from cache when it is still fresh.
+   *
+   * There is deliberately no force flag. Mutations invalidate the tx:list: prefix first, so the
+   * next load() misses and refetches on its own, which is exactly how the server behaves: the
+   * three commands call RemoveByPrefix and the next query repopulates. One mechanism, two
+   * layers. design: doc 07 sections 4 and 6.
+   */
   async load(): Promise<void> {
+    const current = this.query();
+    const key = transactionListCacheKey(current);
+
+    const cached = this.cache.get<CachedPage>(key);
+    if (cached) {
+      this.rows.set(cached.items);
+      this.total.set(cached.totalCount);
+      this.loadedAt.set(cached.loadedAt);
+      this.fromCache.set(true);
+      return;
+    }
+
     this.busy.set(true);
 
     try {
-      const current = this.query();
       const result = await this.api.invoke(listTransactions, {
         status: current.status,
         page: current.page,
@@ -104,11 +157,33 @@ export class TransactionsStore {
         sortDir: current.sortDir,
       });
 
-      this.rows.set(result.items ?? []);
-      this.total.set(Number(result.totalCount ?? 0));
+      const page: CachedPage = {
+        items: result.items ?? [],
+        totalCount: Number(result.totalCount ?? 0),
+        loadedAt: Date.now(),
+      };
+
+      this.cache.set(key, page);
+
+      this.rows.set(page.items);
+      this.total.set(page.totalCount);
+      this.loadedAt.set(page.loadedAt);
+      this.fromCache.set(false);
     } finally {
       this.busy.set(false);
     }
+  }
+
+  /**
+   * Drops the cache and reloads. Backs the Refresh control.
+   *
+   * Caching a financial list means another user's change can stay invisible for up to 45
+   * seconds. That is the contract doc 07 chose, but it is only honest if the user has a way to
+   * override it, which is what this is for.
+   */
+  async refresh(): Promise<void> {
+    this.cache.invalidatePrefix(TRANSACTION_LIST_PREFIX);
+    await this.load();
   }
 
   /** Changing a filter resets to page one; staying on page 40 of a different filter is nonsense. */
@@ -153,6 +228,12 @@ export class TransactionsStore {
   /**
    * Reads one transaction and its ETag. The ETag is a response HEADER, not a body field
    * (doc 05 section 4), so this uses invoke$Response rather than invoke.
+   *
+   * Deliberately NOT cached, for two reasons that point the same way. design: doc 07 section 4
+   * keeps get by id off the cache in favour of the ETag and a 304, because correctness beats
+   * micro savings on a primary key lookup. And this is the call the edit form makes to obtain
+   * the If-Match value: a cached ETag would be a stale one, and the server would answer 412 to
+   * a user who had changed nothing.
    */
   async loadOne(id: string): Promise<{ transaction: TransactionDto; etag: string }> {
     const response = await this.api.invoke$Response(getTransactionById, { id });
@@ -165,7 +246,7 @@ export class TransactionsStore {
 
   async create(request: CreateTransactionRequest): Promise<TransactionDto> {
     const created = await this.api.invoke(createTransaction, { body: request });
-    await this.load();
+    await this.invalidateAndReload();
 
     return created;
   }
@@ -186,7 +267,7 @@ export class TransactionsStore {
       body: request,
     });
 
-    await this.load();
+    await this.invalidateAndReload();
 
     return updated;
   }
@@ -194,6 +275,19 @@ export class TransactionsStore {
   /** Soft delete. The row is archived to Inactive, never removed. design: doc 05 section 7. */
   async softDelete(id: string): Promise<void> {
     await this.api.invoke(deleteTransaction, { id });
+    await this.invalidateAndReload();
+  }
+
+  /**
+   * Every write clears the whole tx:list: family before reloading.
+   *
+   * The whole family, not just the current key, because a write can move a row between slices:
+   * archiving takes it out of Active and puts it into Inactive, so leaving the Inactive page
+   * cached would show a list missing a row that is now in it. design: doc 07 section 4, which is
+   * why the server invalidates by prefix too.
+   */
+  private async invalidateAndReload(): Promise<void> {
+    this.cache.invalidatePrefix(TRANSACTION_LIST_PREFIX);
     await this.load();
   }
 }

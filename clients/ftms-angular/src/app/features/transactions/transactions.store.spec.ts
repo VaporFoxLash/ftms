@@ -1,7 +1,13 @@
 import { TestBed } from '@angular/core/testing';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Api } from '../../core/api/generated/api';
-import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, TransactionsStore } from './transactions.store';
+import { TRANSACTION_LIST_STALE_MS } from '../../core/caching/transaction-list-cache';
+import {
+  DEFAULT_PAGE_SIZE,
+  MAX_PAGE_SIZE,
+  TransactionsStore,
+  transactionListCacheKey,
+} from './transactions.store';
 
 /**
  * design: doc 08 section 5 - test what the user sees rather than component internals. For a
@@ -11,12 +17,18 @@ describe('TransactionsStore', () => {
   let store: TransactionsStore;
   let invoke: ReturnType<typeof vi.fn>;
   let invokeResponse: ReturnType<typeof vi.fn>;
+  let now: number;
 
   const emptyPage = { items: [], page: 1, pageSize: 50, totalCount: 0, totalPages: 0 };
 
   beforeEach(() => {
     invoke = vi.fn().mockResolvedValue(emptyPage);
     invokeResponse = vi.fn();
+
+    // The clock is read through Date.now() so it can be moved with a spy, rather than fake
+    // timers, which would also intercept the promise scheduling the store relies on.
+    now = 1_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
 
     TestBed.configureTestingModule({
       providers: [
@@ -26,6 +38,10 @@ describe('TransactionsStore', () => {
     });
 
     store = TestBed.inject(TransactionsStore);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('opens on Active, page one, newest first, matching the endpoint defaults', () => {
@@ -158,5 +174,111 @@ describe('TransactionsStore', () => {
 
     await pending;
     expect(store.isLoading()).toBe(false);
+  });
+
+  /**
+   * design: doc 07 section 6 - "The same 45 second staleness contract as the server cache
+   * applies to the client's own memory of the list, so both clients agree on how fresh is
+   * fresh." The server half is doc 07 section 4: tx:list: entries live 45 seconds and all three
+   * commands invalidate by prefix.
+   */
+  describe('the 45 second staleness contract', () => {
+    it('builds the same cache key shape the server does', () => {
+      // Matches CacheKeys.TransactionList in FTMS.Application. Identical keys and an identical
+      // TTL are what make the two caches agree rather than merely coexist.
+      expect(transactionListCacheKey(store.currentQuery())).toBe(
+        'tx:list:Active:1:50:transactionDate:desc',
+      );
+    });
+
+    it('serves a repeated load from cache without touching the API', async () => {
+      await store.load();
+      expect(invoke).toHaveBeenCalledTimes(1);
+
+      now += 44_000;
+      await store.load();
+
+      expect(invoke).toHaveBeenCalledTimes(1);
+      expect(store.servedFromCache()).toBe(true);
+    });
+
+    it('refetches once the entry is older than the window', async () => {
+      await store.load();
+      now += TRANSACTION_LIST_STALE_MS + 1;
+
+      await store.load();
+
+      expect(invoke).toHaveBeenCalledTimes(2);
+      expect(store.servedFromCache()).toBe(false);
+    });
+
+    it('does not serve one query shape from another shape cache entry', async () => {
+      await store.load();
+
+      await store.setStatus('Inactive');
+
+      // A different slice is a different key, so the cache cannot hand back Active rows for an
+      // Inactive filter. This is the failure mode a bare timestamp would have had.
+      expect(invoke).toHaveBeenCalledTimes(2);
+      expect(store.servedFromCache()).toBe(false);
+    });
+
+    it('reports when rows came from cache and when they came from the network', async () => {
+      await store.load();
+      expect(store.servedFromCache()).toBe(false);
+      expect(store.lastLoadedAt()).toBe(now);
+
+      const fetchedAt = now;
+      now += 1_000;
+      await store.load();
+
+      expect(store.servedFromCache()).toBe(true);
+
+      // The age is when the rows were FETCHED, not when they were read out of the cache.
+      // Stamping it on read would make a stale list claim to be brand new.
+      expect(store.lastLoadedAt()).toBe(fetchedAt);
+    });
+
+    it.each([
+      ['create', async () => void (await store.create({} as never))],
+      ['update', async () => void (await store.update('id', 'etag', {} as never))],
+      ['softDelete', async () => void (await store.softDelete('id'))],
+    ])('%s invalidates the cache and refetches rather than replaying it', async (_name, mutate) => {
+      await store.load();
+      invoke.mockClear();
+
+      await mutate();
+
+      // Two calls: the write itself, then a genuine reload. Still well inside the 45 second
+      // window, so without the prefix invalidation the reload would have been served from
+      // cache and shown a list the write had just made wrong.
+      expect(invoke).toHaveBeenCalledTimes(2);
+      expect(store.servedFromCache()).toBe(false);
+    });
+
+    it('refresh forces a fetch even when the entry is fresh', async () => {
+      await store.load();
+      invoke.mockClear();
+
+      await store.refresh();
+
+      expect(invoke).toHaveBeenCalledTimes(1);
+      expect(store.servedFromCache()).toBe(false);
+    });
+
+    it('never caches get by id, because that is where the ETag comes from', async () => {
+      // design: doc 07 section 4 keeps get by id off the cache in favour of ETag and 304. A
+      // cached ETag would be a stale one, and the edit form would get a 412 for a change the
+      // user did make cleanly.
+      invokeResponse.mockResolvedValue({
+        body: { id: 'abc' },
+        headers: { get: () => '"AAAAAAAAB9E="' },
+      });
+
+      await store.loadOne('abc');
+      await store.loadOne('abc');
+
+      expect(invokeResponse).toHaveBeenCalledTimes(2);
+    });
   });
 });

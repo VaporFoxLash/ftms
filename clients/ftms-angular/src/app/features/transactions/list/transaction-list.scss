@@ -1,3 +1,12 @@
+// Row height must match ROW_HEIGHT_PX in transaction-list.ts, which feeds cdkVirtualFor's
+// [itemSize]. If these drift, rows overlap or gaps open up mid scroll.
+$row-height: 44px;
+
+// One template shared by the header row and every body row. Declaring it once is what keeps the
+// columns aligned now that this is a grid rather than a table, where the browser used to do it.
+$columns: minmax(9rem, 1.2fr) minmax(8rem, 1fr) minmax(7rem, 0.8fr) minmax(7rem, 0.8fr)
+  minmax(6rem, 0.7fr) minmax(11rem, auto);
+
 .transactions__header {
   display: flex;
   align-items: flex-start;
@@ -25,44 +34,73 @@
   margin: 1.25rem 0 0.75rem;
 }
 
-.transactions__loading {
-  color: #64748b;
-  font-size: 0.85rem;
-  padding-bottom: 0.5rem;
+.transactions__freshness {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding-bottom: 0.1rem;
 }
 
-// Wide tables scroll inside their own container rather than pushing the page sideways.
-.transactions__table-wrap {
-  overflow-x: auto;
+.transactions__age {
+  color: #94a3b8;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.grid {
   border: 1px solid #e2e8f0;
   border-radius: 8px;
+
+  // Wide content scrolls inside its own container rather than pushing the page sideways.
+  overflow-x: auto;
+
+  // Focused programmatically after an archive, never by tabbing, so the ring would be noise.
+  &:focus {
+    outline: none;
+  }
 }
 
-.table {
-  width: 100%;
-  border-collapse: collapse;
+.grid__row {
+  display: grid;
+  grid-template-columns: $columns;
+  align-items: center;
+  gap: 0 0.85rem;
+  height: $row-height;
+  padding: 0 0.85rem;
+  border-bottom: 1px solid #f1f5f9;
+
+  // The grid columns have minimums, so on a narrow screen the row is wider than the viewport
+  // and .grid scrolls it. Without this the columns would squash instead.
+  min-width: max-content;
+}
+
+.grid__row--head {
+  background: #f8fafc;
+  font-weight: 600;
+  color: #334155;
+  border-radius: 8px 8px 0 0;
+}
+
+.grid__cell {
   font-size: 0.92rem;
-
-  th,
-  td {
-    padding: 0.6rem 0.85rem;
-    text-align: left;
-    border-bottom: 1px solid #f1f5f9;
-    white-space: nowrap;
-  }
-
-  thead th {
-    background: #f8fafc;
-    font-weight: 600;
-    color: #334155;
-  }
-
-  tbody tr:last-child td {
-    border-bottom: none;
-  }
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.table__sort {
+// Money right aligned and tabular so decimal points line up down the column.
+.grid__cell--amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.grid__cell--actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.grid__sort {
   background: none;
   border: none;
   padding: 0;
@@ -75,18 +113,21 @@
   align-items: center;
 }
 
-// Money right aligned and tabular so decimal points line up down the column.
-.table__amount {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
+.grid__viewport {
+  // Height is bound from the component so a short list does not reserve an empty screen.
+  width: 100%;
+
+  .cdk-virtual-scroll-content-wrapper {
+    min-width: max-content;
+  }
+
+  .grid__row:last-child {
+    border-bottom: none;
+  }
 }
 
-.table__actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.table__empty {
+.grid__empty {
+  display: block;
   text-align: center;
   color: #64748b;
   padding: 2rem 0.85rem;

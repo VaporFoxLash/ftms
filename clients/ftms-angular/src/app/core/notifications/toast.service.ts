@@ -1,4 +1,5 @@
-import { Injectable, signal } from '@angular/core';
+import { LiveAnnouncer } from '@angular/cdk/a11y';
+import { Injectable, inject, signal } from '@angular/core';
 
 export type ToastLevel = 'info' | 'success' | 'error';
 
@@ -18,6 +19,8 @@ export interface Toast {
  */
 @Injectable({ providedIn: 'root' })
 export class ToastService {
+  private readonly announcer = inject(LiveAnnouncer);
+
   private nextId = 1;
   private readonly items = signal<readonly Toast[]>([]);
 
@@ -47,5 +50,16 @@ export class ToastService {
   private push(level: ToastLevel, message: string, detail?: string): void {
     const toast: Toast = { id: this.nextId++, level, message, detail };
     this.items.update((current) => [...current, toast]);
+
+    // Announcement goes through the CDK LiveAnnouncer rather than an aria-live region in the
+    // template. The template markup carries NO aria-live and NO role="status" precisely because
+    // of this: with both in place a screen reader announces every toast twice.
+    //
+    // Errors interrupt, everything else waits its turn. A failed archive is worth cutting into
+    // whatever is being read; "Transaction captured" is not.
+    void this.announcer.announce(
+      detail ? `${message}. ${detail}` : message,
+      level === 'error' ? 'assertive' : 'polite',
+    );
   }
 }

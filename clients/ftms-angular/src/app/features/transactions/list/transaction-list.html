@@ -34,88 +34,123 @@
       </select>
     </label>
 
-    @if (store.isLoading()) {
-      <span class="transactions__loading" role="status">Loading…</span>
-    }
+    <!--
+      The list can be up to 45 seconds stale (doc 07 section 6), which is a deliberate contract
+      but an invisible one. The age and this button are what make it honest: the user can always
+      see how old the data is and always has a way to override the cache.
+    -->
+    <div class="transactions__freshness">
+      <button type="button" class="button" [disabled]="store.isLoading()" (click)="refresh()">
+        Refresh
+      </button>
+
+      @if (store.isLoading()) {
+        <span class="transactions__age" role="status">Loading…</span>
+      } @else if (freshness(); as age) {
+        <span class="transactions__age">Updated {{ age }}</span>
+      }
+    </div>
   </div>
 
-  <div class="transactions__table-wrap">
-    <table class="table">
-      <thead>
-        <tr>
-          @for (field of sortableFields; track field) {
-            <th scope="col">
-              <button type="button" class="table__sort" (click)="changeSort(field)">
-                {{ sortFieldLabels[field] }}
-                @if (store.currentQuery().sortBy === field) {
-                  <span aria-hidden="true">{{
-                    store.currentQuery().sortDir === 'desc' ? '▼' : '▲'
-                  }}</span>
-                }
-              </button>
-            </th>
-          }
-          <th scope="col">Status</th>
-          <th scope="col"><span class="visually-hidden">Actions</span></th>
-        </tr>
-      </thead>
-
-      <tbody>
-        @for (transaction of store.transactions(); track trackById($index, transaction)) {
-          <tr>
-            <td>{{ transaction.transactionDate | date: 'yyyy-MM-dd HH:mm' : 'UTC' }}</td>
-            <td class="table__amount">
-              {{ transaction.currencyCode }} {{ transaction.amount | number: '1.2-2' }}
-            </td>
-            <td>{{ transaction.createdAtUtc | date: 'yyyy-MM-dd' : 'UTC' }}</td>
-            <td>{{ transaction.transactionType }}</td>
-            <td><ftms-status-badge [status]="transaction.status" /></td>
-            <td class="table__actions">
-              <!--
-                View is always offered: get by id returns a transaction in any status, because
-                that endpoint is the audit window (doc 05 section 4).
-
-                Edit and Archive are not. Completed, Cancelled and Inactive records are history
-                (doc 05 section 6), so Edit would earn a 409 and Archive would be a no op.
-                Offering a control that always fails teaches users to distrust the screen.
-              -->
-              <a class="button button--link" [routerLink]="['/transactions', transaction.id]"
-                >View</a
-              >
-
-              @if (isWorking(transaction.status)) {
-                <a
-                  class="button button--link"
-                  [routerLink]="['/transactions', transaction.id, 'edit']"
-                >
-                  Edit
-                </a>
+  <!--
+    Not a <table>. cdk-virtual-scroll-viewport has to be the scrolling container, and table
+    layout does not survive the display:block that requires: the columns stop aligning. A CSS
+    grid with explicit ARIA roles keeps the semantics a screen reader needs, and keeps the
+    getByRole('row') selectors in the Playwright journey working.
+    design: doc 07 section 5 - virtualisation is the seatbelt for large pages.
+  -->
+  <!-- tabindex="-1" makes this programmatically focusable but keeps it out of the tab order,
+       so archiving a row can put focus back on the grid rather than on <body>. -->
+  <div #grid class="grid" role="table" aria-label="Transactions" tabindex="-1">
+    <div class="grid__head" role="rowgroup">
+      <div class="grid__row grid__row--head" role="row">
+        @for (field of sortableFields; track field) {
+          <div class="grid__cell" role="columnheader">
+            <button type="button" class="grid__sort" (click)="changeSort(field)">
+              {{ sortFieldLabels[field] }}
+              @if (store.currentQuery().sortBy === field) {
+                <span aria-hidden="true">{{
+                  store.currentQuery().sortDir === 'desc' ? '▼' : '▲'
+                }}</span>
               }
-
-              @if (transaction.status !== 'Inactive') {
-                <button
-                  type="button"
-                  class="button button--danger-link"
-                  (click)="askToArchive(transaction)"
-                >
-                  Archive
-                </button>
-              }
-            </td>
-          </tr>
-        } @empty {
-          <tr>
-            <td class="table__empty" colspan="6">
-              @if (store.isLoading()) {
-                Loading transactions…
-              } @else {
-                No {{ store.status() | lowercase }} transactions yet.
-              }
-            </td>
-          </tr>
+            </button>
+          </div>
         }
-      </tbody>
-    </table>
+        <div class="grid__cell" role="columnheader">Status</div>
+        <div class="grid__cell" role="columnheader">
+          <span class="visually-hidden">Actions</span>
+        </div>
+      </div>
+    </div>
+
+    @if (store.transactions().length > 0) {
+      <cdk-virtual-scroll-viewport
+        class="grid__viewport"
+        role="rowgroup"
+        [itemSize]="rowHeight"
+        [style.height]="viewportHeight()"
+      >
+        <div
+          class="grid__row"
+          role="row"
+          *cdkVirtualFor="let transaction of store.transactions(); trackBy: trackById"
+        >
+          <div class="grid__cell" role="cell">
+            {{ transaction.transactionDate | date: 'yyyy-MM-dd HH:mm' : 'UTC' }}
+          </div>
+          <div class="grid__cell grid__cell--amount" role="cell">
+            {{ transaction.currencyCode }} {{ transaction.amount | number: '1.2-2' }}
+          </div>
+          <div class="grid__cell" role="cell">
+            {{ transaction.createdAtUtc | date: 'yyyy-MM-dd' : 'UTC' }}
+          </div>
+          <div class="grid__cell" role="cell">{{ transaction.transactionType }}</div>
+          <div class="grid__cell" role="cell">
+            <ftms-status-badge [status]="transaction.status" />
+          </div>
+          <div class="grid__cell grid__cell--actions" role="cell">
+            <!--
+              View is always offered: get by id returns a transaction in any status, because
+              that endpoint is the audit window (doc 05 section 4).
+
+              Edit and Archive are not. Completed, Cancelled and Inactive records are history
+              (doc 05 section 6), so Edit would earn a 409 and Archive would be a no op.
+              Offering a control that always fails teaches users to distrust the screen.
+            -->
+            <a class="button button--link" [routerLink]="['/transactions', transaction.id]">View</a>
+
+            @if (isWorking(transaction.status)) {
+              <a
+                class="button button--link"
+                [routerLink]="['/transactions', transaction.id, 'edit']"
+              >
+                Edit
+              </a>
+            }
+
+            @if (transaction.status !== 'Inactive') {
+              <button
+                type="button"
+                class="button button--danger-link"
+                (click)="askToArchive(transaction)"
+              >
+                Archive
+              </button>
+            }
+          </div>
+        </div>
+      </cdk-virtual-scroll-viewport>
+    } @else {
+      <div class="grid__empty" role="row">
+        <div role="cell">
+          @if (store.isLoading()) {
+            Loading transactions…
+          } @else {
+            No {{ store.status() | lowercase }} transactions yet.
+          }
+        </div>
+      </div>
+    }
   </div>
 
   <ftms-paging
@@ -126,22 +161,3 @@
     (pageChange)="store.goToPage($event)"
   />
 </section>
-
-@if (pendingArchive(); as target) {
-  <ftms-confirm-dialog
-    title="Archive this transaction?"
-    [message]="
-      'This moves the ' +
-      target.transactionType +
-      ' of ' +
-      target.currencyCode +
-      ' ' +
-      target.amount +
-      ' to Inactive. The record is kept for audit, but it cannot be reactivated from here.'
-    "
-    confirmLabel="Archive"
-    [busy]="archiving()"
-    (confirmed)="confirmArchive()"
-    (cancelled)="cancelArchive()"
-  />
-}

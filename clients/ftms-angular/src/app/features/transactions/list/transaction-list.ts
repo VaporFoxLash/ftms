@@ -1,13 +1,25 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { Dialog } from '@angular/cdk/dialog';
+import { ScrollingModule } from '@angular/cdk/scrolling';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  ElementRef,
+  OnInit,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { DatePipe, DecimalPipe, LowerCasePipe } from '@angular/common';
-import { debounceTime, distinctUntilChanged } from 'rxjs';
+import { debounceTime, distinctUntilChanged, firstValueFrom } from 'rxjs';
 import { TransactionDto } from '../../../core/api/generated/models/transaction-dto';
 import { StatusStore } from '../../../core/transaction-statuses/status.store';
 import { ToastService } from '../../../core/notifications/toast.service';
-import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
+import { ConfirmDialog, ConfirmDialogData } from '../../../shared/confirm-dialog/confirm-dialog';
 import { Paging } from '../../../shared/paging/paging';
 import { StatusBadge } from '../../../shared/status-badge/status-badge';
 import {
@@ -16,6 +28,18 @@ import {
   SortField,
   TransactionsStore,
 } from '../transactions.store';
+
+/**
+ * Row height in pixels.
+ *
+ * Virtual scrolling needs a fixed row height, and the CSS needs the same number. Declaring it
+ * once here and feeding it to both the [itemSize] binding and a CSS custom property is what
+ * stops the two drifting, which would show up as rows overlapping or gaps appearing mid scroll.
+ */
+export const ROW_HEIGHT_PX = 44;
+
+/** How often the "updated Ns ago" label recomputes. */
+const FRESHNESS_TICK_MS = 10_000;
 
 /**
  * The transactions screen. design: doc 07 section 5 - this is the hot path.
@@ -29,9 +53,9 @@ import {
     DatePipe,
     DecimalPipe,
     LowerCasePipe,
+    ScrollingModule,
     StatusBadge,
     Paging,
-    ConfirmDialog,
   ],
   providers: [TransactionsStore],
   templateUrl: './transaction-list.html',
@@ -41,15 +65,48 @@ export class TransactionList implements OnInit {
   protected readonly store = inject(TransactionsStore);
   protected readonly statuses = inject(StatusStore);
   private readonly toasts = inject(ToastService);
+  private readonly dialog = inject(Dialog);
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly sortableFields = SORTABLE_FIELDS;
   protected readonly sortFieldLabels = SORT_FIELD_LABELS;
+  protected readonly rowHeight = ROW_HEIGHT_PX;
 
   protected readonly statusFilter = new FormControl<string>('Active', { nonNullable: true });
 
-  /** The row awaiting confirmation, or null when no dialog is open. */
-  protected readonly pendingArchive = signal<TransactionDto | null>(null);
-  protected readonly archiving = signal(false);
+  /** The grid wrapper, so focus has somewhere to land when the opener is archived away. */
+  private readonly grid = viewChild<ElementRef<HTMLElement>>('grid');
+
+  /** Ticks so the freshness label re-renders. Angular 22 is zoneless: without a signal
+      changing, nothing schedules a render and the label would freeze at its first value. */
+  private readonly tick = signal(0);
+
+  /**
+   * Height of the scrolling viewport. Capped so a long list scrolls, but shrunk to fit so a
+   * three row list does not reserve half a screen of empty space.
+   */
+  protected readonly viewportHeight = computed(() => {
+    const rows = Math.max(this.store.transactions().length, 1);
+    return `min(60vh, ${rows * ROW_HEIGHT_PX}px)`;
+  });
+
+  /** "just now" / "12s ago" / "3m ago", or null before the first load. */
+  protected readonly freshness = computed(() => {
+    this.tick();
+
+    const loadedAt = this.store.lastLoadedAt();
+    if (loadedAt === null) {
+      return null;
+    }
+
+    const seconds = Math.max(0, Math.round((Date.now() - loadedAt) / 1000));
+
+    if (seconds < 5) {
+      return 'just now';
+    }
+
+    return seconds < 60 ? `${seconds}s ago` : `${Math.floor(seconds / 60)}m ago`;
+  });
 
   constructor() {
     // design: doc 07 section 5 - filter inputs debounce 300 ms before hitting the API so
@@ -58,6 +115,9 @@ export class TransactionList implements OnInit {
     this.statusFilter.valueChanges
       .pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed())
       .subscribe((status) => void this.store.setStatus(status));
+
+    const ticker = setInterval(() => this.tick.update((value) => value + 1), FRESHNESS_TICK_MS);
+    this.destroyRef.onDestroy(() => clearInterval(ticker));
   }
 
   async ngOnInit(): Promise<void> {
@@ -69,8 +129,8 @@ export class TransactionList implements OnInit {
   /**
    * trackBy for the row list.
    * design: doc 07 section 5 - trackBy on every list so Angular patches rows instead of
-   * rebuilding them. Without it, every poll or filter change throws away and recreates every
-   * DOM row, which is what makes long financial lists feel sluggish.
+   * rebuilding them. cdkVirtualFor takes the same trackBy, so virtualising the list did not
+   * cost us this.
    */
   protected trackById = (_: number, transaction: TransactionDto): string => transaction.id;
 
@@ -94,35 +154,60 @@ export class TransactionList implements OnInit {
     await this.store.setSort(sortBy, sortDir);
   }
 
-  protected askToArchive(transaction: TransactionDto): void {
-    this.pendingArchive.set(transaction);
+  protected async refresh(): Promise<void> {
+    await this.store.refresh();
+    this.tick.update((value) => value + 1);
   }
 
-  protected cancelArchive(): void {
-    this.pendingArchive.set(null);
-  }
+  /**
+   * Opens the archive confirmation.
+   *
+   * The dialog owns the in flight state and stays open if the archive fails, so the handler
+   * passed here is simply the work to do. The toast fires only on success.
+   */
+  protected async askToArchive(transaction: TransactionDto): Promise<void> {
+    const data: ConfirmDialogData = {
+      title: 'Archive this transaction?',
+      message:
+        `This moves the ${transaction.transactionType} of ${transaction.currencyCode} ` +
+        `${transaction.amount} to Inactive. The record is kept for audit, but it cannot be ` +
+        `reactivated from here.`,
+      confirmLabel: 'Archive',
+      onConfirm: () => this.store.softDelete(transaction.id),
+    };
 
-  protected async confirmArchive(): Promise<void> {
-    const target = this.pendingArchive();
+    const ref = this.dialog.open<boolean>(ConfirmDialog, {
+      data,
+      panelClass: 'ftms-dialog-panel',
+      backdropClass: 'ftms-dialog-backdrop',
 
-    if (!target) {
+      // Set explicitly rather than left to the CDK default, which is false. We do trap focus
+      // and block background scrolling, so claiming modality here is accurate, and the whole
+      // reason for moving off the hand rolled dialog was to stop the markup claiming things
+      // the behaviour did not back up.
+      ariaModal: true,
+
+      // Focus starts inside the dialog and returns to the Archive button that opened it.
+      autoFocus: 'first-tabbable',
+      restoreFocus: true,
+    });
+
+    const archived = await firstValueFrom(ref.closed);
+
+    if (!archived) {
+      // Cancelled or dismissed. The CDK has already put focus back on the Archive button.
       return;
     }
 
-    this.archiving.set(true);
+    this.toasts.success(
+      'Transaction archived',
+      `${transaction.transactionType} of ${transaction.currencyCode} ${transaction.amount}`,
+    );
 
-    try {
-      await this.store.softDelete(target.id);
-      this.toasts.success(
-        `Transaction archived`,
-        `${target.transactionType} of ${target.currencyCode} ${target.amount}`,
-      );
-      this.pendingArchive.set(null);
-    } catch {
-      // The error interceptor has already surfaced the problem. Leave the dialog open so the
-      // user can retry without hunting for the row again.
-    } finally {
-      this.archiving.set(false);
-    }
+    // On success the Archive button that opened the dialog no longer exists: the row has left
+    // the Active list. The CDK has nothing to restore focus to and drops it on <body>, which
+    // strands a keyboard user at the top of the document. Move focus to the grid instead, so
+    // the next Tab continues from where they were working.
+    this.grid()?.nativeElement.focus();
   }
 }
