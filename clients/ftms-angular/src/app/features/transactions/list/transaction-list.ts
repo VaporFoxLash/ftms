@@ -10,7 +10,12 @@ import { ToastService } from '../../../core/notifications/toast.service';
 import { ConfirmDialog } from '../../../shared/confirm-dialog/confirm-dialog';
 import { Paging } from '../../../shared/paging/paging';
 import { StatusBadge } from '../../../shared/status-badge/status-badge';
-import { SORTABLE_FIELDS, SortField, TransactionsStore } from '../transactions.store';
+import {
+  SORTABLE_FIELDS,
+  SORT_FIELD_LABELS,
+  SortField,
+  TransactionsStore,
+} from '../transactions.store';
 
 /**
  * The transactions screen. design: doc 07 section 5 - this is the hot path.
@@ -38,6 +43,7 @@ export class TransactionList implements OnInit {
   private readonly toasts = inject(ToastService);
 
   protected readonly sortableFields = SORTABLE_FIELDS;
+  protected readonly sortFieldLabels = SORT_FIELD_LABELS;
 
   protected readonly statusFilter = new FormControl<string>('Active', { nonNullable: true });
 
@@ -107,7 +113,10 @@ export class TransactionList implements OnInit {
 
     try {
       await this.store.softDelete(target.id);
-      this.toasts.success(`Transaction archived`, `${target.transactionType} of ${target.currencyCode} ${target.amount}`);
+      this.toasts.success(
+        `Transaction archived`,
+        `${target.transactionType} of ${target.currencyCode} ${target.amount}`,
+      );
       this.pendingArchive.set(null);
     } catch {
       // The error interceptor has already surfaced the problem. Leave the dialog open so the

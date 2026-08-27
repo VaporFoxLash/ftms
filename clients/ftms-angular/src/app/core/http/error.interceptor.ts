@@ -45,7 +45,9 @@ export const errorInterceptor: HttpInterceptorFn = (request, next) => {
       if (!handledByTheCaller) {
         toasts.error(
           problem.message,
-          problem.traceId ? `${problem.detail ?? ''} (trace ${problem.traceId})`.trim() : problem.detail,
+          problem.traceId
+            ? `${problem.detail ?? ''} (trace ${problem.traceId})`.trim()
+            : problem.detail,
         );
       }
 

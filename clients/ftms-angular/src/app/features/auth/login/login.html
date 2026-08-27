@@ -3,14 +3,19 @@
 
   <p class="notice notice--warning" role="note">
     <strong>Development sign in.</strong> This verifies nothing and issues whatever role you pick.
-    It exists so the stack runs end to end before ASP.NET Core Identity lands (design doc 06),
-    and it is removed with the API's <code>/api/dev/token</code> endpoint.
+    It exists so the stack runs end to end before ASP.NET Core Identity lands (design doc 06), and
+    it is removed with the API's <code>/api/dev/token</code> endpoint.
   </p>
 
   <form class="form" [formGroup]="form" (ngSubmit)="signIn()" novalidate>
     <label class="field">
       <span class="field__label">User name</span>
-      <input class="field__control" type="text" autocomplete="username" formControlName="userName" />
+      <input
+        class="field__control"
+        type="text"
+        autocomplete="username"
+        formControlName="userName"
+      />
     </label>
 
     <label class="field">

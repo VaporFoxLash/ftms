@@ -19,24 +19,71 @@ public class TransactionCreationTests
     }
 
     [Fact]
-    public void A_new_transaction_gets_a_time_ordered_guid_and_a_created_stamp()
+    public void A_new_transaction_gets_an_id_and_a_created_stamp()
     {
+        var transaction = TransactionBuilder.Active().Build();
+
+        transaction.Id.ShouldNotBe(Guid.Empty);
+        transaction.Id.Version.ShouldBe(7, "design: doc 02 section 1.2 asks for sequential GUIDs.");
+        transaction.CreatedAtUtc.Kind.ShouldBe(DateTimeKind.Utc);
+        transaction.ModifiedAtUtc.ShouldBeNull("a record that has never been changed has no modified stamp.");
+    }
+
+    [Fact]
+    public void Ids_carry_their_creation_time_and_never_go_backwards()
+    {
+        // design: doc 02 section 1.2 - GUID v7 keys carry a 48 bit big endian millisecond
+        // timestamp in their leading bytes, which is what makes them "sequential".
+        //
+        // What v7 does NOT promise is ordering WITHIN a millisecond: RFC 9562 fills the
+        // remaining 74 bits with randomness, and Guid.CreateVersion7 has no monotonic counter,
+        // so two ids minted in the same millisecond sort by coin flip. Asserting strict
+        // ordering on two back to back creations is therefore a 50/50 bet, not a test.
+        //
+        // So assert the property that actually holds: timestamps never go backwards.
+        var ids = Enumerable.Range(0, 50)
+            .Select(_ => TransactionBuilder.Active().Build().Id)
+            .ToList();
+
+        var timestamps = ids.Select(TimestampOf).ToList();
+
+        timestamps
+            .SequenceEqual(timestamps.Order())
+            .ShouldBeTrue("v7 ids must never travel back in time.");
+
+        timestamps.ShouldAllBe(value => value > 0);
+    }
+
+    [Fact]
+    public void Ids_created_after_a_real_delay_sort_in_creation_order()
+    {
+        // Across a millisecond boundary the ordering guarantee is real, so this is the strict
+        // version of the assertion above.
         var first = TransactionBuilder.Active().Build();
+        Thread.Sleep(5);
         var second = TransactionBuilder.Active().Build();
 
-        first.Id.ShouldNotBe(Guid.Empty);
+        TimestampOf(first.Id).ShouldBeLessThan(TimestampOf(second.Id));
 
-        // design: doc 02 section 1.2 - GUID v7 keys carry their creation time in the leading
-        // bytes, so they sort by creation time in byte / string order.
-        //
-        // Note the comparison used here. Guid.CompareTo orders by the struct's internal fields
-        // (_a as an int, then _b and _c as shorts, then the trailing bytes), not left to right,
-        // so it does NOT observe v7 monotonicity. Ordinal string order does.
-        // SQL Server's uniqueidentifier order is a third ordering again: it compares the LAST
-        // six bytes first. See the index note in the Infrastructure entity configuration.
+        // In byte order the whole id sorts too. Note this is NOT Guid.CompareTo, which orders
+        // by the struct's internal fields rather than left to right, and NOT SQL Server's
+        // uniqueidentifier order, which compares the LAST six bytes first. Three different
+        // orderings for the same value, which is exactly why the clustered index lives on
+        // CreatedAtUtc rather than on Id.
         string.CompareOrdinal(first.Id.ToString(), second.Id.ToString()).ShouldBeLessThan(0);
-        first.CreatedAtUtc.Kind.ShouldBe(DateTimeKind.Utc);
-        first.ModifiedAtUtc.ShouldBeNull("a record that has never been changed has no modified stamp.");
+    }
+
+    /// <summary>The 48 bit big endian Unix millisecond timestamp from a version 7 GUID.</summary>
+    private static long TimestampOf(Guid id)
+    {
+        var bytes = id.ToByteArray(bigEndian: true);
+
+        return ((long)bytes[0] << 40)
+            | ((long)bytes[1] << 32)
+            | ((long)bytes[2] << 24)
+            | ((long)bytes[3] << 16)
+            | ((long)bytes[4] << 8)
+            | bytes[5];
     }
 
     [Fact]

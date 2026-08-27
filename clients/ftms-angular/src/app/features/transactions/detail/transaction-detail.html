@@ -33,13 +33,17 @@
       </dd>
 
       <dt>Identifier</dt>
-      <dd><code>{{ tx.id }}</code></dd>
+      <dd>
+        <code>{{ tx.id }}</code>
+      </dd>
 
       <dt>
         Version
         <span class="detail__hint">Concurrency token sent as If-Match on edit</span>
       </dt>
-      <dd><code>{{ etag() }}</code></dd>
+      <dd>
+        <code>{{ etag() }}</code>
+      </dd>
     </dl>
 
     @if (tx.status === 'Active' || tx.status === 'Pending') {

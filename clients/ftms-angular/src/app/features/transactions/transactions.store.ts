@@ -15,9 +15,28 @@ export const MAX_PAGE_SIZE = 200;
 export const DEFAULT_PAGE_SIZE = 50;
 
 /** The sort fields the API is willing to order by; anything else is a 400. */
-export const SORTABLE_FIELDS = ['transactionDate', 'amount', 'createdAtUtc', 'transactionType'] as const;
+export const SORTABLE_FIELDS = [
+  'transactionDate',
+  'amount',
+  'createdAtUtc',
+  'transactionType',
+] as const;
 
 export type SortField = (typeof SORTABLE_FIELDS)[number];
+
+/**
+ * Column headings for the sortable fields.
+ *
+ * The field names above are part of the API contract and must be sent verbatim, but they are
+ * developer vocabulary. A finance user reading a transaction list should see "Captured", not
+ * "createdAtUtc".
+ */
+export const SORT_FIELD_LABELS: Readonly<Record<SortField, string>> = {
+  transactionDate: 'Date',
+  amount: 'Amount',
+  createdAtUtc: 'Captured',
+  transactionType: 'Type',
+};
 
 export interface ListQuery {
   readonly status: string;
@@ -156,7 +175,11 @@ export class TransactionsStore {
    * without an If-Match header and 412 when it is stale, which is what stops two people
    * silently overwriting each other (doc 05 section 6).
    */
-  async update(id: string, etag: string, request: UpdateTransactionRequest): Promise<TransactionDto> {
+  async update(
+    id: string,
+    etag: string,
+    request: UpdateTransactionRequest,
+  ): Promise<TransactionDto> {
     const updated = await this.api.invoke(updateTransaction, {
       id,
       'If-Match': etag,

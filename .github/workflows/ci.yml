@@ -1,0 +1,338 @@
+# design: doc 08 section 8 - the pipeline is ordered by cost. Fast feedback first, containers
+# only after the cheap gates pass, security and performance on the release candidate, journeys
+# last. A red anywhere stops the line.
+#
+#   commit -> build + analysers -> unit + architecture -> integration (Testcontainers)
+#          -> dependency + secret scan -> package candidate -> ZAP + k6 -> journeys -> release
+#
+# The ZAP and k6 jobs are scaffolded and commented out at the bottom: they need a deployed
+# candidate to point at, which arrives with the deployment pipeline.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  NODE_VERSION: '24'
+  DOTNET_NOLOGO: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------------------
+  # Cheapest gate. Warnings are errors across the solution, so this catches a great deal.
+  # ---------------------------------------------------------------------------------------
+  build:
+    name: Build and analyse
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: |
+          dotnet restore
+          dotnet tool restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+  # ---------------------------------------------------------------------------------------
+  # Milliseconds. The domain has zero infrastructure dependencies, which is what makes the
+  # pyramid cheap (doc 08 section 1). Architecture tests ride along: they are just as fast and
+  # they fail the build rather than a code review comment three months too late.
+  # ---------------------------------------------------------------------------------------
+  unit-tests:
+    name: Unit and architecture tests
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Domain unit tests
+        run: >
+          dotnet test tests/FTMS.Domain.UnitTests --no-restore --configuration Release
+          --logger "trx;LogFileName=domain.trx"
+          --collect:"XPlat Code Coverage"
+
+      - name: Application unit tests
+        run: >
+          dotnet test tests/FTMS.Application.UnitTests --no-restore --configuration Release
+          --logger "trx;LogFileName=application.trx"
+          --collect:"XPlat Code Coverage"
+
+      - name: Architecture tests
+        run: >
+          dotnet test tests/FTMS.ArchitectureTests --no-restore --configuration Release
+          --logger "trx;LogFileName=architecture.trx"
+
+      # TODO design: doc 08 section 9 - coverage floors of 90 percent on Domain and Application
+      # and 80 percent overall, enforced here once a report generator step is added. Coverage is
+      # a floor and never a goal.
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dotnet-test-results
+          path: '**/TestResults/**'
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------------------
+  # Containers only after the cheap gates pass. Real SQL Server 2022, never SQLite, because the
+  # design leans on rowversion, filtered indexes, ledger tables and migrations (doc 08 dec 4).
+  # Testcontainers starts the container itself; the runner just needs a Docker daemon, which
+  # ubuntu-latest has.
+  # ---------------------------------------------------------------------------------------
+  integration-tests:
+    name: Integration tests (real SQL Server)
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Integration tests
+        run: >
+          dotnet test tests/FTMS.Api.IntegrationTests --no-restore --configuration Release
+          --logger "trx;LogFileName=integration.trx"
+
+      # These must never be skipped in CI. Locally a machine without Docker reports them
+      # skipped, which is honest; here a skip would mean the promise verifying tests
+      # (audit completeness, the soft delete guarantee, migration versus design parity) silently
+      # did not run.
+      - name: Fail if the suite skipped instead of running
+        run: |
+          if grep -rq 'outcome="NotExecuted"' tests/FTMS.Api.IntegrationTests/TestResults/*.trx; then
+            echo "::error::Integration tests were SKIPPED in CI. Docker must be available."
+            exit 1
+          fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: tests/FTMS.Api.IntegrationTests/TestResults/**
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------------------
+  # design: doc 08 section 7.1 - every CI run audits dependencies and scans for secrets.
+  # Cheap, and the class of problem it catches is the class that reaches production quietly.
+  # ---------------------------------------------------------------------------------------
+  security-audit:
+    name: Dependency and secret scan
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: clients/ftms-angular/package-lock.json
+
+      - name: Restore
+        run: dotnet restore
+
+      # NuGet audit already runs during restore and warnings are errors, so a vulnerable
+      # transitive package fails the build. This makes the finding legible rather than a
+      # NU1903 buried in build output.
+      - name: NuGet vulnerability audit
+        run: |
+          dotnet list package --vulnerable --include-transitive 2>&1 | tee nuget-audit.txt
+          if grep -q 'has the following vulnerable packages' nuget-audit.txt; then
+            echo "::error::Vulnerable NuGet packages found."
+            exit 1
+          fi
+
+      - name: npm vulnerability audit
+        working-directory: clients/ftms-angular
+        run: npm audit --audit-level=high
+
+      - name: Secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ---------------------------------------------------------------------------------------
+  # Frontend. The generated API client is committed, so this needs no running backend.
+  # ---------------------------------------------------------------------------------------
+  frontend:
+    name: Frontend lint, test and build
+    runs-on: ubuntu-latest
+    needs: build
+    defaults:
+      run:
+        working-directory: clients/ftms-angular
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: clients/ftms-angular/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Format check
+        run: npx prettier --check "src/**/*.{ts,html,scss}" "e2e/**/*.ts"
+
+      - name: Unit tests
+        run: npm run test:ci
+
+      # Bundle budgets live in angular.json, so a dependency that bloats the bundle fails here
+      # rather than slowing every user. design: doc 07 section 5.
+      - name: Production build with bundle budgets
+        run: npm run build
+
+      # Catches the drift the committed client is meant to prevent: if someone changed the API
+      # and did not regenerate, the checked in client no longer matches the snapshot.
+      - name: Verify the generated client matches the committed OpenAPI snapshot
+        run: |
+          npm run generate:api:offline
+          if ! git diff --quiet -- src/app/core/api/generated; then
+            echo "::error::The generated API client is stale. Run 'npm run generate:api' and commit."
+            git --no-pager diff --stat -- src/app/core/api/generated
+            exit 1
+          fi
+
+  # ---------------------------------------------------------------------------------------
+  # Journeys last: few, slow, and run against a real API backed by a real database.
+  # design: doc 08 section 5 - the suite stays small deliberately.
+  # ---------------------------------------------------------------------------------------
+  e2e:
+    name: Playwright journeys
+    runs-on: ubuntu-latest
+    needs: [integration-tests, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: clients/ftms-angular/package-lock.json
+
+      - name: Start SQL Server
+        run: docker compose up -d sqlserver
+
+      - name: Install frontend dependencies
+        working-directory: clients/ftms-angular
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: clients/ftms-angular
+        run: npx playwright install --with-deps chromium
+
+      - name: Start the API
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ConnectionStrings__FtmsDatabase: 'Server=localhost,1433;Database=Ftms;User Id=sa;Password=Ftms_Local_Dev_1;TrustServerCertificate=True'
+        run: |
+          dotnet run --project src/FTMS.Api --urls http://localhost:5150 &
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:5150/health && break
+            sleep 2
+          done
+
+      - name: Run journeys
+        working-directory: clients/ftms-angular
+        run: npm run e2e
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: clients/ftms-angular/playwright-report/
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------------------
+  # Placeholders, deliberately not enabled. Both need a deployed release candidate to point at,
+  # which arrives with the deployment pipeline. Written down now so they are scheduled work
+  # rather than something remembered during an audit.
+  # ---------------------------------------------------------------------------------------
+
+  # design: doc 08 section 7.2 - every release candidate gets an authenticated OWASP ZAP
+  # baseline scan against the running API and SPA, with the findings gate set to FAIL ON MEDIUM
+  # AND ABOVE. Not a warning: doc 08 is explicit that medium fails.
+  #
+  # zap-baseline:
+  #   name: OWASP ZAP baseline
+  #   runs-on: ubuntu-latest
+  #   needs: e2e
+  #   if: github.ref == 'refs/heads/main'
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: ZAP baseline scan
+  #       uses: zaproxy/action-baseline@v0.12.0
+  #       with:
+  #         target: ${{ vars.FTMS_CANDIDATE_URL }}
+  #         rules_file_name: .zap/rules.tsv
+  #         fail_action: true
+  #         cmd_options: '-a -l WARN'
+
+  # design: doc 07 section 1 and doc 08 section 6 - the k6 suite encodes the performance budgets
+  # as FAILING thresholds, which is what turns performance from an opinion into a gate:
+  #
+  #   get by id      p95 < 50 ms
+  #   active list    p95 < 200 ms
+  #   writes         p95 < 300 ms end to end, including audit and cache invalidation
+  #
+  # Two profiles: steady state at expected load, and a spike at five times that. Both against
+  # hardware matching production's Express constraints, or the numbers mean nothing.
+  #
+  # k6-performance:
+  #   name: k6 performance budgets
+  #   runs-on: ubuntu-latest
+  #   needs: e2e
+  #   if: github.ref == 'refs/heads/main'
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Steady state profile
+  #       uses: grafana/run-k6-action@v1
+  #       with:
+  #         path: tests/performance/steady-state.js
+  #     - name: Spike profile
+  #       uses: grafana/run-k6-action@v1
+  #       with:
+  #         path: tests/performance/spike.js

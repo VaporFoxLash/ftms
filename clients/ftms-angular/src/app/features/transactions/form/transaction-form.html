@@ -11,8 +11,9 @@
   } @else {
     @if (isEdit() && !isEditable()) {
       <p class="notice notice--warning" role="alert">
-        This transaction is <strong>{{ status() }}</strong>. Completed, cancelled and archived
-        records are history and cannot be edited. Capture a new transaction instead.
+        This transaction is <strong>{{ status() }}</strong
+        >. Completed, cancelled and archived records are history and cannot be edited. Capture a new
+        transaction instead.
       </p>
     }
 
@@ -20,7 +21,10 @@
       <label class="field">
         <span class="field__label">Transaction date</span>
         <input class="field__control" type="datetime-local" formControlName="transactionDate" />
-        @if (form.controls.transactionDate.touched && form.controls.transactionDate.errors; as errors) {
+        @if (
+          form.controls.transactionDate.touched && form.controls.transactionDate.errors;
+          as errors
+        ) {
           <span class="field__error">
             @if (errors['required']) {
               A transaction date is required.
@@ -38,7 +42,10 @@
             <option [value]="type">{{ type }}</option>
           }
         </select>
-        @if (form.controls.transactionType.touched && form.controls.transactionType.errors; as errors) {
+        @if (
+          form.controls.transactionType.touched && form.controls.transactionType.errors;
+          as errors
+        ) {
           <span class="field__error">{{ errors['server'] ?? 'Choose a transaction type.' }}</span>
         }
       </label>
@@ -100,11 +107,7 @@
 
       <div class="form__actions">
         <a class="button" routerLink="/transactions">Cancel</a>
-        <button
-          class="button button--primary"
-          type="submit"
-          [disabled]="saving() || !isEditable()"
-        >
+        <button class="button button--primary" type="submit" [disabled]="saving() || !isEditable()">
           {{ saving() ? 'Saving…' : isEdit() ? 'Save changes' : 'Capture' }}
         </button>
       </div>

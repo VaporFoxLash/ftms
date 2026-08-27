@@ -46,9 +46,11 @@
           @for (field of sortableFields; track field) {
             <th scope="col">
               <button type="button" class="table__sort" (click)="changeSort(field)">
-                {{ field }}
+                {{ sortFieldLabels[field] }}
                 @if (store.currentQuery().sortBy === field) {
-                  <span aria-hidden="true">{{ store.currentQuery().sortDir === 'desc' ? '▼' : '▲' }}</span>
+                  <span aria-hidden="true">{{
+                    store.currentQuery().sortDir === 'desc' ? '▼' : '▲'
+                  }}</span>
                 }
               </button>
             </th>
@@ -77,16 +79,25 @@
                 (doc 05 section 6), so Edit would earn a 409 and Archive would be a no op.
                 Offering a control that always fails teaches users to distrust the screen.
               -->
-              <a class="button button--link" [routerLink]="['/transactions', transaction.id]">View</a>
+              <a class="button button--link" [routerLink]="['/transactions', transaction.id]"
+                >View</a
+              >
 
               @if (isWorking(transaction.status)) {
-                <a class="button button--link" [routerLink]="['/transactions', transaction.id, 'edit']">
+                <a
+                  class="button button--link"
+                  [routerLink]="['/transactions', transaction.id, 'edit']"
+                >
                   Edit
                 </a>
               }
 
               @if (transaction.status !== 'Inactive') {
-                <button type="button" class="button button--danger-link" (click)="askToArchive(transaction)">
+                <button
+                  type="button"
+                  class="button button--danger-link"
+                  (click)="askToArchive(transaction)"
+                >
                   Archive
                 </button>
               }

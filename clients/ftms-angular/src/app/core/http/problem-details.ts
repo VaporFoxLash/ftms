@@ -80,6 +80,8 @@ function messageForStatus(status: number): string {
     case 429:
       return 'Too many requests, please slow down';
     default:
-      return status >= 500 ? 'Something went wrong on the server' : 'The request could not be completed';
+      return status >= 500
+        ? 'Something went wrong on the server'
+        : 'The request could not be completed';
   }
 }

@@ -19,7 +19,10 @@ describe('TransactionsStore', () => {
     invokeResponse = vi.fn();
 
     TestBed.configureTestingModule({
-      providers: [TransactionsStore, { provide: Api, useValue: { invoke, invoke$Response: invokeResponse } }],
+      providers: [
+        TransactionsStore,
+        { provide: Api, useValue: { invoke, invoke$Response: invokeResponse } },
+      ],
     });
 
     store = TestBed.inject(TransactionsStore);

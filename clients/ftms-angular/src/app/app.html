@@ -39,7 +39,12 @@
           <span class="toast__detail">{{ toast.detail }}</span>
         }
       </div>
-      <button type="button" class="toast__close" aria-label="Dismiss" (click)="toasts.dismiss(toast.id)">
+      <button
+        type="button"
+        class="toast__close"
+        aria-label="Dismiss"
+        (click)="toasts.dismiss(toast.id)"
+      >
         ×
       </button>
     </div>
