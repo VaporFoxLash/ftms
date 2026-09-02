@@ -29,7 +29,11 @@ export default defineConfig({
   // and a pass look identical in a summary line. The integration suite has the same guard
   // against outcome="NotExecuted" for the same reason.
   reporter: process.env['CI']
-    ? [['list'], ['html', { open: 'never' }], ['json', { outputFile: 'playwright-report/results.json' }]]
+    ? [
+        ['list'],
+        ['html', { open: 'never' }],
+        ['json', { outputFile: 'playwright-report/results.json' }],
+      ]
     : 'list',
 
   use: {
