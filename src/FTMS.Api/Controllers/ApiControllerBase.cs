@@ -1,4 +1,5 @@
 using FTMS.Api.Middleware;
+using FTMS.Domain.Transactions;
 using FTMS.SharedKernel.Results;
 using Microsoft.AspNetCore.Mvc;
 
@@ -52,6 +53,8 @@ public abstract class ApiControllerBase : ControllerBase
                 ErrorType.NotFound => StatusCodes.Status404NotFound,
                 ErrorType.Validation => StatusCodes.Status400BadRequest,
                 ErrorType.Conflict => StatusCodes.Status409Conflict,
+                ErrorType.Unauthorized => StatusCodes.Status401Unauthorized,
+                ErrorType.Locked => StatusCodes.Status423Locked,
                 _ => StatusCodes.Status500InternalServerError,
             };
 
@@ -77,15 +80,21 @@ public abstract class ApiControllerBase : ControllerBase
         };
     }
 
-    /// <summary>The code DomainErrors uses for a lost optimistic concurrency check.</summary>
-    private const string ConcurrencyConflictCode = "transaction.concurrency_conflict";
+    /// <summary>
+    /// The code DomainErrors uses for a lost optimistic concurrency check. Aliased from the
+    /// domain rather than retyped as a literal, so renaming the code cannot leave this mapping
+    /// silently pointing at a string nothing produces any more.
+    /// </summary>
+    private const string ConcurrencyConflictCode = DomainErrors.Transaction.ConcurrencyConflictCode;
 
     private static string TitleFor(int statusCode) => statusCode switch
     {
         StatusCodes.Status400BadRequest => "Bad request",
+        StatusCodes.Status401Unauthorized => "Unauthorized",
         StatusCodes.Status404NotFound => "Not found",
         StatusCodes.Status409Conflict => "Conflict",
         StatusCodes.Status412PreconditionFailed => "Precondition failed",
+        StatusCodes.Status423Locked => "Account locked",
         _ => "An unexpected error occurred",
     };
 }

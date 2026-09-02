@@ -2,37 +2,43 @@
   <header class="transactions__header">
     <div>
       <h1 class="transactions__title">Transactions</h1>
-      <p class="transactions__subtitle">
-        A record of every transaction. Nothing is ever deleted, only archived.
-      </p>
     </div>
 
-    <a class="button button--primary" routerLink="/transactions/new">Capture transaction</a>
+    <a z-button routerLink="/transactions/new">Capture transaction</a>
   </header>
 
   <div class="transactions__filters">
-    <label class="field">
-      <span class="field__label">Status</span>
-      <select class="field__control" [formControl]="statusFilter">
-        @for (name of statuses.names(); track name) {
-          <option [value]="name">{{ name }}</option>
-        }
-      </select>
-    </label>
-
-    <label class="field">
-      <span class="field__label">Rows per page</span>
-      <select
-        class="field__control"
-        [value]="store.pageSize()"
-        (change)="store.setPageSize(+$any($event.target).value)"
+    <div class="field">
+      <span class="field__label" id="status-filter-label">Status</span>
+      <z-select
+        [formControl]="statusFilter"
+        zPlaceholder="Any status"
+        zLabelledBy="status-filter-label"
       >
-        <option [value]="25">25</option>
-        <option [value]="50">50</option>
-        <option [value]="100">100</option>
-        <option [value]="200">200</option>
-      </select>
-    </label>
+        @for (name of statuses.names(); track name) {
+          <z-select-item [zValue]="name">{{ name }}</z-select-item>
+        }
+
+        <!--
+          Clear lives in the dropdown rather than beside it. It is not a status, so it sits below
+          a separator, and it is only offered when there is something to clear - an always present
+          "Clear filters" on an unfiltered list is a control that does nothing.
+        -->
+        @if (!store.isDefaultQuery()) {
+          <z-select-separator />
+          <z-select-item [zValue]="clearFiltersValue">Clear filters</z-select-item>
+        }
+      </z-select>
+    </div>
+
+    <div class="field">
+      <span class="field__label" id="page-size-label">Rows per page</span>
+      <z-select [formControl]="pageSizeControl" zLabelledBy="page-size-label">
+        @for (size of pageSizes; track size) {
+          <z-select-item [zValue]="size.toString()">{{ size }}</z-select-item>
+        }
+      </z-select>
+    </div>
 
     <!--
       The list can be up to 45 seconds stale (doc 07 section 6), which is a deliberate contract
@@ -40,7 +46,14 @@
       see how old the data is and always has a way to override the cache.
     -->
     <div class="transactions__freshness">
-      <button type="button" class="button" [disabled]="store.isLoading()" (click)="refresh()">
+      <button
+        type="button"
+        z-button
+        zType="outline"
+        class="transactions__refresh"
+        [disabled]="store.isLoading()"
+        (click)="refresh()"
+      >
         Refresh
       </button>
 
@@ -64,8 +77,18 @@
   <div #grid class="grid" role="table" aria-label="Transactions" tabindex="-1">
     <div class="grid__head" role="rowgroup">
       <div class="grid__row grid__row--head" role="row">
+        <!-- Id first, matching the order the brief lists the columns in. Not sortable: the API
+             allow-lists sortBy to transactionDate, amount, createdAtUtc and transactionType, and
+             a header that looks clickable but 400s would be worse than one that does not. -->
+        <div class="grid__cell" role="columnheader">Id</div>
         @for (field of sortableFields; track field) {
-          <div class="grid__cell" role="columnheader">
+          <!-- The amount header follows its values to the right edge. A left aligned heading over
+               right aligned figures reads as two different columns. -->
+          <div
+            class="grid__cell"
+            [class.grid__cell--amount]="field === 'amount'"
+            role="columnheader"
+          >
             <button type="button" class="grid__sort" (click)="changeSort(field)">
               {{ sortFieldLabels[field] }}
               @if (store.currentQuery().sortBy === field) {
@@ -96,6 +119,17 @@
           *cdkVirtualFor="let transaction of store.transactions(); trackBy: trackById"
         >
           <div class="grid__cell" role="cell">
+            <button
+              type="button"
+              class="grid__id"
+              [title]="transaction.id"
+              [attr.aria-label]="'Copy full id ' + transaction.id"
+              (click)="copyId(transaction.id)"
+            >
+              …{{ shortId(transaction.id) }}
+            </button>
+          </div>
+          <div class="grid__cell" role="cell">
             {{ transaction.transactionDate | date: 'yyyy-MM-dd HH:mm' : 'UTC' }}
           </div>
           <div class="grid__cell grid__cell--amount" role="cell">
@@ -113,15 +147,22 @@
               View is always offered: get by id returns a transaction in any status, because
               that endpoint is the audit window (doc 05 section 4).
 
-              Edit and Archive are not. Completed, Cancelled and Inactive records are history
-              (doc 05 section 6), so Edit would earn a 409 and Archive would be a no op.
+              Edit and Delete are not. Completed, Cancelled and Inactive records are history
+              (doc 05 section 6), so Edit would earn a 409 and Delete would be a no op.
               Offering a control that always fails teaches users to distrust the screen.
+
+              "Delete" is the label only. The call underneath is still the soft delete: the row
+              moves to Inactive and the record is never destroyed (doc 05 section 7).
             -->
-            <a class="button button--link" [routerLink]="['/transactions', transaction.id]">View</a>
+            <a z-button zType="link" zSize="sm" [routerLink]="['/transactions', transaction.id]"
+              >View</a
+            >
 
             @if (isWorking(transaction.status)) {
               <a
-                class="button button--link"
+                z-button
+                zType="link"
+                zSize="sm"
                 [routerLink]="['/transactions', transaction.id, 'edit']"
               >
                 Edit
@@ -131,10 +172,13 @@
             @if (transaction.status !== 'Inactive') {
               <button
                 type="button"
-                class="button button--danger-link"
-                (click)="askToArchive(transaction)"
+                z-button
+                zType="link"
+                zSize="sm"
+                class="text-destructive"
+                (click)="askToDelete(transaction)"
               >
-                Archive
+                Delete
               </button>
             }
           </div>

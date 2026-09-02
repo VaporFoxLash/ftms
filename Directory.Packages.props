@@ -30,12 +30,16 @@
     <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="$(MicrosoftVersion)" />
     <PackageVersion Include="Microsoft.Extensions.Options" Version="$(MicrosoftVersion)" />
     <PackageVersion Include="Scrutor" Version="7.0.0" />
+    <!-- Identity's EF stores live in Infrastructure, not the API. The layering rules forbid
+         EF Core and ASP.NET Core in Domain and Application; Infrastructure is precisely the
+         ring where a framework-shaped persistence concern belongs. design: doc 06 section 3. -->
+    <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="$(MicrosoftVersion)" />
+    <PackageVersion Include="System.IdentityModel.Tokens.Jwt" Version="8.14.0" />
   </ItemGroup>
 
   <ItemGroup Label="Api">
     <PackageVersion Include="Microsoft.AspNetCore.OpenApi" Version="$(MicrosoftVersion)" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="$(MicrosoftVersion)" />
-    <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="$(MicrosoftVersion)" />
     <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.EntityFrameworkCore" Version="$(MicrosoftVersion)" />
     <PackageVersion Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.2.3" />
     <!-- Transitive pin. Microsoft.AspNetCore.OpenApi 10.0.8 resolves Microsoft.OpenApi 2.0.0,

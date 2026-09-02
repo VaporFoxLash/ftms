@@ -14,7 +14,7 @@ export interface ListTransactions$Params {
   page?: (number | string);
   pageSize?: (number | string);
   sortBy?: string;
-  sortDir?: string;
+  sortDirection?: string;
 }
 
 export function listTransactions(http: HttpClient, rootUrl: string, params?: ListTransactions$Params, context?: HttpContext): Observable<StrictHttpResponse<PagedResultOfTransactionDto>> {
@@ -24,7 +24,7 @@ export function listTransactions(http: HttpClient, rootUrl: string, params?: Lis
     rb.query('page', params.page, {});
     rb.query('pageSize', params.pageSize, {});
     rb.query('sortBy', params.sortBy, {});
-    rb.query('sortDir', params.sortDir, {});
+    rb.query('sortDirection', params.sortDirection, {});
   }
 
   return http.request(

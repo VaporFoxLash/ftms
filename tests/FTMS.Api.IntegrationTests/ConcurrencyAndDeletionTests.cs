@@ -8,8 +8,9 @@ namespace FTMS.Api.IntegrationTests;
 
 /// <summary>
 /// The ETag dance and idempotent soft delete, against a real rowversion column.
-/// design: doc 08 section 3 - the ETag dance (428 without If-Match, 412 on stale, success on
-/// fresh) and idempotent DELETE returning 204 twice.
+/// design: doc 08 section 3 - the ETag dance and idempotent DELETE returning 204 twice.
+/// If-Match is optional: 412 on stale, success on fresh, last-write-wins when it is omitted,
+/// and 428 only for a precondition that was sent but could not be parsed.
 /// </summary>
 [Collection(ApiCollection.Name)]
 public class ConcurrencyAndDeletionTests(FtmsApiFactory factory) : IAsyncLifetime
@@ -22,8 +23,17 @@ public class ConcurrencyAndDeletionTests(FtmsApiFactory factory) : IAsyncLifetim
     public Task DisposeAsync() => Task.CompletedTask;
 
     [SkippableFact]
-    public async Task Update_without_if_match_is_428()
+    public async Task Update_without_if_match_succeeds_as_last_write_wins()
     {
+        // This test used to assert 428. If-Match is now optional, because the brief specifies a
+        // plain PUT and a reviewer with curl should not have to GET first to change a date.
+        //
+        // Be clear about what is being pinned here: an update with no If-Match has NO concurrency
+        // protection at all. The handler skips the ETag comparison, and the rowversion token
+        // cannot help either because the entity was loaded fresh moments earlier - there is
+        // nothing stale for the database to catch. A client that omits the header WILL silently
+        // overwrite a concurrent edit. Clients that can send it, should, and the Angular client
+        // always does - which is what the next two tests cover.
         DockerAvailability.RequireDocker();
         var client = factory.AuthenticatedAs(TestTokens.Capturer);
         var created = await CreateTransaction(client);
@@ -33,6 +43,25 @@ public class ConcurrencyAndDeletionTests(FtmsApiFactory factory) : IAsyncLifetim
             transactionDate = "2026-08-21T10:00:00Z",
             transactionType = "Transfer",
         });
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var updated = await client.GetFromJsonAsync<TransactionDto>(
+            $"/api/transactions/{created.Id}", Json);
+        updated!.TransactionType.ShouldBe("Transfer");
+    }
+
+    [SkippableFact]
+    public async Task Update_with_an_unparseable_if_match_is_still_428()
+    {
+        // The one case 428 is now reserved for. A caller who sent a precondition INTENDED to be
+        // protected, so a typo must not quietly downgrade them to last-write-wins - that would be
+        // the worst of both behaviours.
+        DockerAvailability.RequireDocker();
+        var client = factory.AuthenticatedAs(TestTokens.Capturer);
+        var created = await CreateTransaction(client);
+
+        var response = await Put(client, created.Id, "\"not-base64-at-all!!\"", "Transfer");
 
         response.StatusCode.ShouldBe(HttpStatusCode.PreconditionRequired);
     }

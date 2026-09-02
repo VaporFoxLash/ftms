@@ -4,6 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { TransactionDto } from '../../../core/api/generated/models/transaction-dto';
 import { StatusBadge } from '../../../shared/status-badge/status-badge';
 import { TransactionsStore } from '../transactions.store';
+import { ZardButtonComponent } from '@/shared/components/button/button.component';
 
 /**
  * One transaction, in any status.
@@ -15,7 +16,7 @@ import { TransactionsStore } from '../transactions.store';
 @Component({
   selector: 'ftms-transaction-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, DecimalPipe, RouterLink, StatusBadge],
+  imports: [DatePipe, DecimalPipe, RouterLink, StatusBadge, ZardButtonComponent],
   providers: [TransactionsStore],
   templateUrl: './transaction-detail.html',
   styleUrl: './transaction-detail.scss',

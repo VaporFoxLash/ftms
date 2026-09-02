@@ -35,13 +35,23 @@ public sealed class Money : ValueObject
     /// Builds a valid Money or explains why it could not. An invalid amount is an expected
     /// outcome of user input, so it is a Result, not an exception. design: doc 03 section 4.
     /// </summary>
-    /// <param name="amount">Zero or greater, at most two decimal places.</param>
+    /// <param name="amount">Greater than zero, at most two decimal places.</param>
     /// <param name="currencyCode">Three letters; defaults to ZAR when null or blank.</param>
     public static Result<Money> Create(decimal amount, string? currencyCode = null)
     {
-        if (amount < 0m)
+        // Strictly greater than zero. This used to be "amount < 0m", which let a zero amount
+        // through the domain while CreateTransactionValidator rejected it - so the two layers
+        // disagreed about what a valid transaction was, and which one you hit depended on whether
+        // you came through the API or constructed the aggregate directly. A transaction that moves
+        // no money is not a transaction, so the domain is the layer that was wrong.
+        //
+        // The CK_Transactions_Amount check constraint stays at >= 0: a database constraint is a
+        // backstop against corruption, and it has no business being the tightest rule in the
+        // system when tightening it would require a migration to say something the domain already
+        // enforces.
+        if (amount <= 0m)
         {
-            return Result.Failure<Money>(DomainErrors.Money.NegativeAmount);
+            return Result.Failure<Money>(DomainErrors.Money.NotPositiveAmount);
         }
 
         // decimal keeps its own scale, so 15.00m and 15m differ in scale but not in value.

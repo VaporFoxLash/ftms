@@ -6,6 +6,7 @@ using FTMS.Api.Middleware;
 using FTMS.Api.Serialization;
 using FTMS.Application;
 using FTMS.Infrastructure;
+using FTMS.Infrastructure.Identity;
 using FTMS.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
@@ -37,9 +38,20 @@ builder.Services
 // design: doc 05 section 9 - OpenAPI is the single client facing contract; both clients
 // generate their API layers from it, so neither hand writes DTOs that can drift.
 builder.Services.AddOpenApi("v1", options =>
-    options.AddSchemaTransformer<DecimalSchemaTransformer>());
+{
+    options.AddSchemaTransformer<DecimalSchemaTransformer>();
 
-builder.Services.AddProblemDetails();
+    // Without these the published contract described every endpoint as anonymous, while the
+    // code required a bearer token on all but three. design: doc 05 section 9.
+    options.AddDocumentTransformer<SecuritySchemeTransformer>();
+    options.AddOperationTransformer<SecurityRequirementTransformer>();
+});
+
+// AddProblemDetails() used to be registered here and did nothing at all: it only takes effect
+// through UseExceptionHandler or UseStatusCodePages, and this pipeline uses neither.
+// ExceptionHandlingMiddleware and ApiControllerBase.Problem between them produce every
+// ProblemDetails response the API emits. An inert registration is worse than no registration,
+// because it reads like error handling is configured somewhere it is not.
 
 // design: doc 06 section 4 - CORS locked to the exact Angular origin with credentials allowed
 // and nothing wildcarded.
@@ -51,6 +63,12 @@ builder.Services.AddCors(options => options.AddPolicy(SpaCorsPolicy, policy => p
     .WithOrigins(allowedOrigins)
     .AllowAnyHeader()
     .AllowAnyMethod()
+
+    // Load bearing, not habit: the refresh token is an httpOnly cookie, and a browser will not
+    // send a cookie on a cross origin XHR unless the response says credentials are allowed. This
+    // is also precisely why WithOrigins names exact origins and why AllowAnyOrigin would be
+    // rejected by the browser in combination with this - a wildcard plus credentials is the one
+    // CORS combination that is never legal.
     .AllowCredentials()
 
     // The SPA reads the ETag to send back as If-Match, and a browser hides response headers
@@ -63,6 +81,10 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
+    // Partitioning by user name and falling back to IP only works because UseRateLimiter runs
+    // AFTER UseAuthentication below. It used to run before, which meant User.Identity was never
+    // populated and every request partitioned by IP - so an office behind one NAT shared a
+    // single bucket, and an authenticated client got no benefit from being identifiable.
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
         RateLimitPartition.GetSlidingWindowLimiter(
             context.User.Identity?.Name
@@ -76,8 +98,29 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0,
             }));
 
-    // TODO design: doc 06 section 4 - add a strict bucket on the login endpoint to blunt
-    // credential stuffing, once that endpoint exists.
+    // design: doc 06 section 4 - the strict bucket on the credential endpoints. Partitioned by
+    // IP rather than by user name, deliberately: the attack this blunts is one source trying
+    // many accounts, so keying on the account being guessed would give the attacker a fresh
+    // allowance per guess. Identity's per account lockout covers the other direction.
+    //
+    // Configurable rather than hard coded, and that is not ceremony. Ten attempts per five
+    // minutes is right for production and wrong for a machine running an end to end suite, where
+    // four browsers sign in within seconds of each other and a developer re-runs it repeatedly -
+    // the first version of this locked the test suite out of its own application. A threshold
+    // that cannot be tuned per environment is one that eventually gets deleted by whoever it
+    // inconveniences, which is a far worse outcome than a looser value in Development.
+    var authPermitLimit = builder.Configuration.GetValue("RateLimiting:Authentication:PermitLimit", 10);
+    var authWindowMinutes = builder.Configuration.GetValue("RateLimiting:Authentication:WindowMinutes", 5);
+
+    options.AddPolicy(RateLimitPolicies.Authentication, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "anonymous",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = authPermitLimit,
+                Window = TimeSpan.FromMinutes(authWindowMinutes),
+                QueueLimit = 0,
+            }));
 });
 
 builder.Services.AddHealthChecks()
@@ -97,13 +140,21 @@ if (app.Environment.IsDevelopment())
         options.RoutePrefix = "swagger";
     });
 
-    app.MapDevelopmentTokenEndpoint();
-
     // design: doc 07 - migrations apply on startup in Development only. In any other
     // environment they run at deployment time under a separate elevated login, because the
     // application's own login has no DDL rights (doc 06 section 5.1).
     await using var scope = app.Services.CreateAsyncScope();
     await scope.ServiceProvider.GetRequiredService<FtmsDbContext>().Database.MigrateAsync();
+
+    // The four demo accounts, one per role, so the stack is usable the moment it starts and the
+    // authorization matrix can be exercised by hand. Refuses to run outside Development - the
+    // credentials are in a committed file. design: doc 06 section 3.
+    await IdentitySeeder.SeedAsync(scope.ServiceProvider, isDevelopment: true);
+
+    // Sample transactions, but only into an empty table. Without these a freshly cloned
+    // repository opens on an empty grid, and paging, sorting and the status filter cannot be
+    // judged against zero rows.
+    await SampleTransactionSeeder.SeedAsync(scope.ServiceProvider, isDevelopment: true);
 }
 else
 {
@@ -113,8 +164,16 @@ else
 }
 
 app.UseCors(SpaCorsPolicy);
-app.UseRateLimiter();
+
+// Authentication BEFORE the rate limiter, which is the reverse of the order this file used to
+// have. The global limiter partitions on context.User.Identity?.Name, and that property is only
+// populated once the authentication middleware has run - so with the old order the user name was
+// unconditionally null and the documented per user partitioning never happened even once.
+//
+// Anonymous floods are still limited: the partition key falls back to the remote IP, which is
+// all that is knowable about an unauthenticated caller anyway.
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 // No RequireRateLimiting here on purpose: the GlobalLimiter configured above already applies
@@ -123,7 +182,7 @@ app.UseAuthorization();
 // time rather than at startup.
 app.MapControllers();
 
-// design: doc 06 section 3 - no anonymous endpoints except login and health.
+// design: doc 06 section 3 - no anonymous endpoints except login, refresh and health.
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
     AllowCachingResponses = false,

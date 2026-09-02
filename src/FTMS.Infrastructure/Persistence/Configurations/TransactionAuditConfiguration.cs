@@ -7,6 +7,13 @@ namespace FTMS.Infrastructure.Persistence.Configurations;
 
 internal sealed class TransactionAuditConfiguration : IEntityTypeConfiguration<TransactionAudit>
 {
+    /// <summary>
+    /// Matches FtmsUserConfiguration.DisplayNameMaxLength, and is referenced by the audit
+    /// interceptor so it can clamp rather than let SQL Server truncate. Exposed as a const
+    /// because two other files need to agree with it.
+    /// </summary>
+    internal const int ChangedByMaxLength = 100;
+
     public void Configure(EntityTypeBuilder<TransactionAudit> builder)
     {
         builder.ToTable("TransactionAudits");
@@ -26,7 +33,7 @@ internal sealed class TransactionAuditConfiguration : IEntityTypeConfiguration<T
         builder.Property(audit => audit.NewValues).IsRequired();
 
         builder.Property(audit => audit.ChangedBy)
-            .HasMaxLength(100)
+            .HasMaxLength(ChangedByMaxLength)
             .IsRequired();
 
         builder.Property(audit => audit.ChangedAtUtc)

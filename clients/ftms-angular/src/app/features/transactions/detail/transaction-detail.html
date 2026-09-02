@@ -1,7 +1,7 @@
 <section class="detail">
   <header class="detail__header">
     <h1 class="detail__title">Transaction</h1>
-    <a class="button button--link" routerLink="/transactions">Back to list</a>
+    <a z-button zType="link" routerLink="/transactions">Back to list</a>
   </header>
 
   @if (loading()) {
@@ -47,7 +47,7 @@
     </dl>
 
     @if (tx.status === 'Active' || tx.status === 'Pending') {
-      <a class="button button--primary" [routerLink]="['/transactions', tx.id, 'edit']">Edit</a>
+      <a z-button [routerLink]="['/transactions', tx.id, 'edit']">Edit</a>
     } @else {
       <p class="detail__note">
         This transaction is {{ tx.status }} and is kept as history. It cannot be edited.

@@ -5,6 +5,7 @@ import { routes } from './app.routes';
 import { provideApiBaseUrl } from './core/api/api-base-url';
 import { authInterceptor } from './core/auth/auth.interceptor';
 import { errorInterceptor } from './core/http/error.interceptor';
+import { provideZard } from '@/shared/core/provider/providezard';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -18,5 +19,6 @@ export const appConfig: ApplicationConfig = {
 
     // Same origin, relative URLs. The dev server proxies /api to the backend.
     provideApiBaseUrl(''),
+    provideZard(),
   ],
 };

@@ -1,5 +1,5 @@
 // The backdrop, centring and panel chrome now come from the CDK overlay (see the
-// .ftms-dialog-panel and .ftms-dialog-backdrop rules in src/styles.scss), so this file styles
+// .ftms-dialog-panel and .ftms-dialog-backdrop rules in src/styles.css), so this file styles
 // only what is inside the dialog.
 
 .dialog__title {
@@ -9,7 +9,7 @@
 
 .dialog__body {
   margin: 0 0 1.25rem;
-  color: #475569;
+  color: var(--ftms-ink-muted);
   line-height: 1.5;
 }
 
@@ -19,26 +19,18 @@
   gap: 0.6rem;
 }
 
-.dialog__cancel,
+// The commit step of a destructive action is black, not amber and not red. The Delete link that
+// opens this dialog is amber - caution; this button is the point of no return, and looks like
+// nothing else in the interface so it cannot be clicked by pattern-matching.
+//
+// A colour override on z-button rather than a button of its own. Structure, sizing, focus ring
+// and disabled behaviour come from the shared component; only the palette is special, which is
+// exactly the case the component's `class` input exists for.
 .dialog__confirm {
-  padding: 0.45rem 1rem;
-  border-radius: 6px;
-  font: inherit;
-  cursor: pointer;
+  background: var(--ftms-destructive-bg);
+  color: var(--ftms-destructive-ink);
 
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
+  &:hover:not(:disabled) {
+    background: var(--ftms-destructive-hover);
   }
-}
-
-.dialog__cancel {
-  border: 1px solid #cbd5e1;
-  background: #fff;
-}
-
-.dialog__confirm {
-  border: 1px solid #b91c1c;
-  background: #dc2626;
-  color: #fff;
 }

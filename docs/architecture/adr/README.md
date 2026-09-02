@@ -44,3 +44,4 @@ noticed.
 | --- | --- | --- |
 | [0001](0001-adopt-angular-cdk.md) | Adopt @angular/cdk for dialog, announcements and virtual scrolling | Accepted |
 | [0002](0002-defer-tanstack-query.md) | Defer TanStack Query while its Angular adapter is experimental | Accepted |
+| [0003](0003-persistent-authentication.md) | Self-hosted ASP.NET Core Identity with rotating refresh tokens | Accepted |

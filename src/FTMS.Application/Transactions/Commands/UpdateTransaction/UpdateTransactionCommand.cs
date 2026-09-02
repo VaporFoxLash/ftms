@@ -11,14 +11,16 @@ namespace FTMS.Application.Transactions.Commands.UpdateTransaction;
 /// workflow arrives, because "update the date" and "cancel a transaction" are different
 /// business acts with different audit meanings.
 ///
-/// RowVersion is the client's ETag, decoded. design: doc 05 section 6 - silent last writer
-/// wins is not acceptable on financial records.
+/// RowVersion is the client's ETag, decoded, and is OPTIONAL. When present the update is a
+/// compare-and-swap and a stale value is refused; when null the caller has opted out and the
+/// update is last-write-wins. design: doc 05 section 6 and the brief, which specifies a plain
+/// PUT with no precondition.
 /// </summary>
 public sealed record UpdateTransactionCommand(
     Guid Id,
     DateTime TransactionDate,
     string TransactionType,
-    byte[] RowVersion) : ICommand<Unit>;
+    byte[]? RowVersion = null) : ICommand<Unit>;
 
 internal sealed class UpdateTransactionValidator : AbstractValidator<UpdateTransactionCommand>
 {
@@ -39,8 +41,9 @@ internal sealed class UpdateTransactionValidator : AbstractValidator<UpdateTrans
             .Must(type => TransactionType.TryFromName(type, out _))
             .WithMessage("Transaction type must be one of Deposit, Withdrawal, Transfer or Payment.");
 
-        RuleFor(command => command.RowVersion)
-            .NotEmpty()
-            .WithMessage("An If-Match header carrying the current ETag is required.");
+        // No rule on RowVersion. It used to be NotEmpty, making If-Match mandatory; it is now
+        // optional by design. A malformed If-Match never reaches here - the controller rejects
+        // that with 428 before dispatching - so the only two states this validator can see are
+        // "a decoded rowversion" and "the caller chose not to send one", and both are valid.
     }
 }

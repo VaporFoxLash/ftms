@@ -33,16 +33,30 @@ public static class DomainErrors
             "transaction.date_required",
             "Transaction date is required.");
 
+        /// <summary>
+        /// Exposed as a const, unlike its siblings, because the API layer has to special case
+        /// this one code onto 412 rather than the 409 its Conflict type would otherwise produce -
+        /// and a const can be referenced by another const, so the mapping cannot drift from the
+        /// error the way a retyped string literal would.
+        /// </summary>
+        public const string ConcurrencyConflictCode = "transaction.concurrency_conflict";
+
         public static readonly Error ConcurrencyConflict = Error.Conflict(
-            "transaction.concurrency_conflict",
+            ConcurrencyConflictCode,
             "The transaction was changed by someone else. Refetch it and reapply your change.");
     }
 
     public static class Money
     {
-        public static readonly Error NegativeAmount = Error.Validation(
+        /// <summary>
+        /// Named for what it rejects rather than for the sign, because it rejects zero too.
+        /// The code keeps its original spelling: error codes are part of the API contract
+        /// (they become the ProblemDetails type URI), so renaming one would break clients that
+        /// switch on it.
+        /// </summary>
+        public static readonly Error NotPositiveAmount = Error.Validation(
             "money.negative_amount",
-            "Amount must be zero or greater. Direction is carried by the transaction type, "
+            "Amount must be greater than zero. Direction is carried by the transaction type, "
             + "not by the sign of the amount.");
 
         public static readonly Error TooManyDecimals = Error.Validation(

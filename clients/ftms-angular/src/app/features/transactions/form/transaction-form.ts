@@ -18,6 +18,9 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ToastService } from '../../../core/notifications/toast.service';
 import { summariseProblem } from '../../../core/http/problem-details';
 import { TransactionsStore } from '../transactions.store';
+import { ZardSelectImports } from '@/shared/components/select/select.imports';
+import { ZardButtonComponent } from '@/shared/components/button/button.component';
+import { ZardInputComponent } from '@/shared/components/input/input.component';
 
 /**
  * The transaction types the domain accepts.
@@ -45,7 +48,13 @@ export function twoDecimalPlaces(control: AbstractControl): ValidationErrors | n
 @Component({
   selector: 'ftms-transaction-form',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    ZardSelectImports,
+    ZardButtonComponent,
+    ZardInputComponent,
+  ],
   providers: [TransactionsStore],
   templateUrl: './transaction-form.html',
   styleUrl: './transaction-form.scss',

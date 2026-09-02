@@ -20,4 +20,9 @@ public static class RouteNames
     public const string UpdateTransaction = "updateTransaction";
     public const string DeleteTransaction = "deleteTransaction";
     public const string ListTransactionStatuses = "listTransactionStatuses";
+
+    public const string Login = "login";
+    public const string RefreshSession = "refreshSession";
+    public const string Logout = "logout";
+    public const string GetCurrentUser = "getCurrentUser";
 }

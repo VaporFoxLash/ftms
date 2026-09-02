@@ -8,6 +8,28 @@
   font-size: 1.5rem;
 }
 
+/*
+ * A failed sign in has to LOOK like a failure.
+ *
+ * There was no rule here, so the message rendered as plain body copy directly beneath the
+ * heading, where it read as a subtitle: the user pressed the button and, as far as the screen
+ * was concerned, nothing happened. The text and its role="alert" were correct all along, which
+ * is why screen readers announced the failure while sighted users saw silence.
+ *
+ * Amber, not red. Per the palette note in styles.css, red belongs to the G4S brand alone, so an
+ * error painted in it cannot be told apart from ordinary chrome. Same tokens and metrics as
+ * .notice--warning on the transaction form, so the app speaks one banner language, not two.
+ */
+.login__error {
+  margin: 0; /* the .form grid gap owns the spacing; a margin here would double it */
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--ftms-notice-border);
+  border-radius: 8px;
+  background: var(--ftms-notice-bg);
+  color: var(--ftms-notice-ink);
+  line-height: 1.5;
+}
+
 .form {
   display: grid;
   gap: 1.1rem;
@@ -17,17 +39,4 @@
 .form__actions {
   display: flex;
   justify-content: flex-end;
-}
-
-.notice {
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  line-height: 1.5;
-  font-size: 0.9rem;
-}
-
-.notice--warning {
-  background: #fef3c7;
-  border: 1px solid #fcd34d;
-  color: #713f12;
 }

@@ -8,15 +8,15 @@
 
 .paging__button {
   padding: 0.4rem 0.9rem;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--ftms-border);
   border-radius: 6px;
-  background: #fff;
+  background: var(--ftms-surface);
   cursor: pointer;
   font: inherit;
 
   &:hover:not(:disabled) {
-    background: #f8fafc;
-    border-color: #94a3b8;
+    background: var(--ftms-bg);
+    border-color: var(--ftms-ink-subtle);
   }
 
   &:disabled {
@@ -27,9 +27,9 @@
 
 .paging__summary {
   font-size: 0.9rem;
-  color: #475569;
+  color: var(--ftms-ink-muted);
 }
 
 .paging__pages {
-  color: #94a3b8;
+  color: var(--ftms-ink-subtle);
 }

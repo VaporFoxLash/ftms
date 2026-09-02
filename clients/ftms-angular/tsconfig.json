@@ -3,6 +3,11 @@
 {
   "compileOnSave": false,
   "compilerOptions": {
+    "paths": {
+      "@/*": [
+        "./src/app/*"
+      ]
+    },
     /* Strict mode, explicitly. A financial client is exactly the kind of code where an
        accidental undefined should be a compile error rather than a blank cell in a list. */
     "strict": true,

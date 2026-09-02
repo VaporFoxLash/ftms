@@ -10,10 +10,11 @@ import { AuthService } from './auth.service';
  * on every endpoint (doc 06 section 3). A guard that a user can disable in devtools is not a
  * security control; it just avoids rendering a screen that would only fill with 401s.
  *
- * TODO design: doc 06 - once refresh tokens land, this should attempt a silent refresh against
- * the httpOnly cookie before redirecting, so a page reload does not look like a logout.
+ * It attempts a silent refresh before redirecting, so a page reload - which loses the in memory
+ * access token by design - does not look like a logout. The httpOnly cookie survives the reload
+ * even though the token does not, which is exactly the property that makes this work.
  */
-export const authGuard: CanActivateFn = (_route, state) => {
+export const authGuard: CanActivateFn = async (_route, state) => {
   const auth = inject(AuthService);
   const router = inject(Router);
 
@@ -21,6 +22,13 @@ export const authGuard: CanActivateFn = (_route, state) => {
     return true;
   }
 
+  if (await auth.restore()) {
+    return true;
+  }
+
+  // returnUrl is read by the login component, which navigates back here on success. It was
+  // being set and ignored before, so a deep link survived the redirect only to be dropped on
+  // the way back.
   return router.createUrlTree(['/auth/login'], {
     queryParams: { returnUrl: state.url },
   });

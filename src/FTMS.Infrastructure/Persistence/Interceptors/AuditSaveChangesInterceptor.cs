@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FTMS.Application.Abstractions;
 using FTMS.Domain.Transactions;
+using FTMS.Infrastructure.Persistence.Configurations;
 using FTMS.Infrastructure.Persistence.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -58,7 +59,11 @@ public sealed class AuditSaveChangesInterceptor(ICurrentUser currentUser) : Save
         // One timestamp for the whole save, so every row written by one business act shares
         // an instant and an auditor can group them without guessing.
         var changedAtUtc = DateTime.UtcNow;
-        var changedBy = currentUser.UserName;
+        // Clamped, because ChangedBy is nvarchar(100) and an over long value would make SQL
+        // Server fail the whole SaveChanges - taking the business write down with the audit row.
+        // The audit trail must never be the reason a legitimate transaction cannot be saved, so a
+        // pathological name is truncated rather than fatal.
+        var changedBy = Clamp(currentUser.UserName);
 
         var entries = context.ChangeTracker
             .Entries<Transaction>()
@@ -89,6 +94,11 @@ public sealed class AuditSaveChangesInterceptor(ICurrentUser currentUser) : Save
                 changedAtUtc));
         }
     }
+
+    private static string Clamp(string userName) =>
+        userName.Length <= TransactionAuditConfiguration.ChangedByMaxLength
+            ? userName
+            : userName[..TransactionAuditConfiguration.ChangedByMaxLength];
 
     /// <summary>
     /// "Someone corrected the date" and "someone archived this record" are different events to

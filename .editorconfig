@@ -1,0 +1,360 @@
+# FTMS — editor and code style configuration.
+#
+# One place for the formatting and style rules every .NET project in this repo shares, in the
+# same spirit as Directory.Build.props holding the compiler properties (design: doc 03).
+#
+# Scope: this file governs src/, tests/ and the repo root. It does NOT reach the Angular client:
+# clients/ftms-angular/.editorconfig declares `root = true`, which stops the upward search there.
+# The client keeps its own two-space, single-quote conventions and is linted by ESLint.
+#
+# Severities: the IDExxxx code style rules below are EDITOR diagnostics. They become build
+# diagnostics only when EnforceCodeStyleInBuild is true, which Directory.Build.props deliberately
+# does not set — with TreatWarningsAsErrors also true, flipping it would turn every style
+# preference into a build break. Style is advice here; correctness analysers are the gate.
+
+root = true
+
+# ---------------------------------------------------------------------------------------------
+# Every file. LF matches .gitattributes, which normalises the repository to LF.
+# ---------------------------------------------------------------------------------------------
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# ---------------------------------------------------------------------------------------------
+# File type overrides. The two-space families are the ecosystem defaults for each format, and
+# .sln / .ps1 are CRLF to agree with .gitattributes.
+# ---------------------------------------------------------------------------------------------
+[*.{json,jsonc,yml,yaml}]
+indent_size = 2
+
+[*.{xml,csproj,props,targets,ruleset,config}]
+indent_size = 2
+
+[*.md]
+indent_size = 2
+max_line_length = off
+# Two trailing spaces are a hard line break in Markdown; stripping them changes rendering.
+trim_trailing_whitespace = false
+
+[*.sln]
+indent_style = tab
+end_of_line = crlf
+
+[*.ps1]
+end_of_line = crlf
+
+[*.sh]
+end_of_line = lf
+
+[*.{ts,js,mjs,html,scss,css}]
+indent_size = 2
+
+# ---------------------------------------------------------------------------------------------
+# C#
+# ---------------------------------------------------------------------------------------------
+[*.cs]
+indent_size = 4
+max_line_length = 120
+
+#### Using directives ####
+
+# System first, then the rest. Consistent ordering keeps merge conflicts in the using block rare.
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+# Usings outside the namespace is the long-standing convention and what ImplicitUsings emits.
+csharp_using_directive_placement = outside_namespace:suggestion
+dotnet_diagnostic.IDE0005.severity = suggestion   # unnecessary using directive
+
+#### Namespaces and file organisation ####
+
+# File-scoped namespaces: one namespace per file is already the rule, and the saved level of
+# indentation matters in a codebase with deep generic signatures.
+csharp_style_namespace_declarations = file_scoped:warning
+dotnet_style_namespace_match_folder = true:suggestion
+
+#### this. and Me. ####
+
+# The _camelCase field convention below already distinguishes fields from locals, so `this.`
+# carries no information.
+dotnet_style_qualification_for_field = false:warning
+dotnet_style_qualification_for_property = false:warning
+dotnet_style_qualification_for_method = false:warning
+dotnet_style_qualification_for_event = false:warning
+
+#### Language keywords over BCL type names ####
+
+dotnet_style_predefined_type_for_locals_parameters_members = true:warning
+dotnet_style_predefined_type_for_member_access = true:warning
+
+#### var ####
+
+# `var` only where the right hand side already names the type. Money, TransactionStatus and the
+# Result types are the vocabulary of this domain; a reader should not have to infer them.
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = false:suggestion
+
+#### Modifiers ####
+
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:warning
+csharp_preferred_modifier_order = public,private,protected,internal,file,static,extern,new,virtual,abstract,sealed,override,readonly,unsafe,required,volatile,async:suggestion
+dotnet_style_readonly_field = true:warning
+csharp_prefer_static_local_function = true:suggestion
+
+#### Expression level preferences ####
+
+dotnet_style_object_initializer = true:suggestion
+dotnet_style_collection_initializer = true:suggestion
+dotnet_style_prefer_auto_properties = true:suggestion
+dotnet_style_explicit_tuple_names = true:warning
+dotnet_style_prefer_inferred_tuple_names = true:suggestion
+dotnet_style_prefer_inferred_anonymous_type_member_names = true:suggestion
+dotnet_style_prefer_conditional_expression_over_assignment = true:silent
+dotnet_style_prefer_conditional_expression_over_return = true:silent
+dotnet_style_prefer_compound_assignment = true:suggestion
+dotnet_style_prefer_simplified_boolean_expressions = true:suggestion
+dotnet_style_prefer_simplified_interpolation = true:suggestion
+csharp_style_prefer_range_operator = true:suggestion
+csharp_style_prefer_index_operator = true:suggestion
+csharp_prefer_simple_default_expression = true:suggestion
+csharp_style_deconstructed_variable_declaration = true:suggestion
+csharp_style_implicit_object_creation_when_type_is_apparent = true:suggestion
+
+#### Null checking ####
+
+# Nullable is enabled solution wide, so these are the idioms that keep it honest.
+dotnet_style_coalesce_expression = true:warning
+dotnet_style_null_propagation = true:warning
+dotnet_style_prefer_is_null_check_over_reference_equality_method = true:warning
+csharp_style_throw_expression = true:suggestion
+csharp_style_conditional_delegate_call = true:suggestion
+csharp_style_prefer_null_check_over_type_check = true:suggestion
+
+#### Pattern matching ####
+
+# The Transaction state machine is a switch over status; pattern matching is how it stays legible.
+csharp_style_pattern_matching_over_is_with_cast_check = true:warning
+csharp_style_pattern_matching_over_as_with_null_check = true:warning
+csharp_style_prefer_switch_expression = true:suggestion
+csharp_style_prefer_pattern_matching = true:suggestion
+csharp_style_prefer_not_pattern = true:suggestion
+csharp_style_prefer_extended_property_pattern = true:suggestion
+
+#### Expression bodied members ####
+
+# Bodies for anything with logic; expressions only where the member is a single obvious mapping.
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_expression_bodied_constructors = false:suggestion
+csharp_style_expression_bodied_operators = when_on_single_line:suggestion
+csharp_style_expression_bodied_properties = true:suggestion
+csharp_style_expression_bodied_indexers = true:suggestion
+csharp_style_expression_bodied_accessors = true:suggestion
+csharp_style_expression_bodied_lambdas = true:suggestion
+csharp_style_expression_bodied_local_functions = false:suggestion
+
+#### Braces and blocks ####
+
+# Braces always, including single statement ifs. This is a financial system; the cost of a
+# misread guard clause is not symmetrical with the cost of two extra characters.
+csharp_prefer_braces = true:warning
+csharp_prefer_simple_using_statement = true:suggestion
+csharp_style_prefer_method_group_conversion = true:suggestion
+csharp_style_prefer_top_level_statements = false:suggestion
+
+#### Formatting: new lines ####
+
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_new_line_before_members_in_object_initializers = true
+csharp_new_line_before_members_in_anonymous_types = true
+csharp_new_line_between_query_expression_clauses = true
+
+#### Formatting: indentation ####
+
+csharp_indent_case_contents = true
+csharp_indent_case_contents_when_block = false
+csharp_indent_switch_labels = true
+csharp_indent_labels = one_less_than_current
+csharp_indent_block_contents = true
+csharp_indent_braces = false
+
+#### Formatting: spacing ####
+
+csharp_space_after_cast = false
+csharp_space_after_keywords_in_control_flow_statements = true
+csharp_space_between_method_declaration_parameter_list_parentheses = false
+csharp_space_between_method_declaration_empty_parameter_list_parentheses = false
+csharp_space_between_method_declaration_name_and_open_parenthesis = false
+csharp_space_between_method_call_parameter_list_parentheses = false
+csharp_space_between_method_call_empty_parameter_list_parentheses = false
+csharp_space_between_method_call_name_and_opening_parenthesis = false
+csharp_space_after_comma = true
+csharp_space_before_comma = false
+csharp_space_after_dot = false
+csharp_space_before_dot = false
+csharp_space_after_semicolon_in_for_statement = true
+csharp_space_before_semicolon_in_for_statement = false
+csharp_space_around_declaration_statements = false
+csharp_space_before_open_square_brackets = false
+csharp_space_between_empty_square_brackets = false
+csharp_space_between_square_brackets = false
+csharp_space_around_binary_operators = before_and_after
+
+#### Formatting: wrapping ####
+
+csharp_preserve_single_line_statements = false
+csharp_preserve_single_line_blocks = true
+
+# ---------------------------------------------------------------------------------------------
+# Naming conventions
+#
+# Read bottom up: symbol groups and styles are declared first, then the rules that pair them.
+# ---------------------------------------------------------------------------------------------
+
+#### Styles ####
+
+dotnet_naming_style.pascal_case.capitalization = pascal_case
+
+dotnet_naming_style.camel_case.capitalization = camel_case
+
+dotnet_naming_style.i_prefixed_pascal_case.capitalization = pascal_case
+dotnet_naming_style.i_prefixed_pascal_case.required_prefix = I
+
+dotnet_naming_style.t_prefixed_pascal_case.capitalization = pascal_case
+dotnet_naming_style.t_prefixed_pascal_case.required_prefix = T
+
+dotnet_naming_style.underscore_camel_case.capitalization = camel_case
+dotnet_naming_style.underscore_camel_case.required_prefix = _
+
+dotnet_naming_style.async_suffixed_pascal_case.capitalization = pascal_case
+dotnet_naming_style.async_suffixed_pascal_case.required_suffix = Async
+
+#### Symbol groups ####
+
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+dotnet_naming_symbols.interfaces.applicable_accessibilities = *
+
+dotnet_naming_symbols.type_parameters.applicable_kinds = type_parameter
+dotnet_naming_symbols.type_parameters.applicable_accessibilities = *
+
+dotnet_naming_symbols.types.applicable_kinds = class,struct,enum,delegate
+dotnet_naming_symbols.types.applicable_accessibilities = *
+
+dotnet_naming_symbols.non_field_members.applicable_kinds = property,method,event
+dotnet_naming_symbols.non_field_members.applicable_accessibilities = *
+
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private,private_protected
+
+dotnet_naming_symbols.constants.applicable_kinds = field
+dotnet_naming_symbols.constants.applicable_accessibilities = *
+dotnet_naming_symbols.constants.required_modifiers = const
+
+dotnet_naming_symbols.static_readonly_fields.applicable_kinds = field
+dotnet_naming_symbols.static_readonly_fields.applicable_accessibilities = public,internal,protected,protected_internal
+dotnet_naming_symbols.static_readonly_fields.required_modifiers = static,readonly
+
+dotnet_naming_symbols.parameters_and_locals.applicable_kinds = parameter,local
+dotnet_naming_symbols.parameters_and_locals.applicable_accessibilities = *
+
+dotnet_naming_symbols.async_methods.applicable_kinds = method
+dotnet_naming_symbols.async_methods.applicable_accessibilities = *
+dotnet_naming_symbols.async_methods.required_modifiers = async
+
+#### Rules ####
+
+dotnet_naming_rule.interfaces_are_i_prefixed.symbols = interfaces
+dotnet_naming_rule.interfaces_are_i_prefixed.style = i_prefixed_pascal_case
+dotnet_naming_rule.interfaces_are_i_prefixed.severity = warning
+
+dotnet_naming_rule.type_parameters_are_t_prefixed.symbols = type_parameters
+dotnet_naming_rule.type_parameters_are_t_prefixed.style = t_prefixed_pascal_case
+dotnet_naming_rule.type_parameters_are_t_prefixed.severity = warning
+
+dotnet_naming_rule.types_are_pascal_case.symbols = types
+dotnet_naming_rule.types_are_pascal_case.style = pascal_case
+dotnet_naming_rule.types_are_pascal_case.severity = warning
+
+dotnet_naming_rule.non_field_members_are_pascal_case.symbols = non_field_members
+dotnet_naming_rule.non_field_members_are_pascal_case.style = pascal_case
+dotnet_naming_rule.non_field_members_are_pascal_case.severity = warning
+
+dotnet_naming_rule.constants_are_pascal_case.symbols = constants
+dotnet_naming_rule.constants_are_pascal_case.style = pascal_case
+dotnet_naming_rule.constants_are_pascal_case.severity = warning
+
+dotnet_naming_rule.static_readonly_fields_are_pascal_case.symbols = static_readonly_fields
+dotnet_naming_rule.static_readonly_fields_are_pascal_case.style = pascal_case
+dotnet_naming_rule.static_readonly_fields_are_pascal_case.severity = warning
+
+# Declared after the const and static readonly rules: first matching rule wins, so those two
+# must be given the chance to match before the general private field rule sees them.
+dotnet_naming_rule.private_fields_are_underscore_camel_case.symbols = private_fields
+dotnet_naming_rule.private_fields_are_underscore_camel_case.style = underscore_camel_case
+dotnet_naming_rule.private_fields_are_underscore_camel_case.severity = warning
+
+dotnet_naming_rule.parameters_and_locals_are_camel_case.symbols = parameters_and_locals
+dotnet_naming_rule.parameters_and_locals_are_camel_case.style = camel_case
+dotnet_naming_rule.parameters_and_locals_are_camel_case.severity = warning
+
+# Suggestion, not warning: the convention is right for the handlers and repositories, but
+# xUnit test methods and a few interface implementations legitimately break it.
+dotnet_naming_rule.async_methods_end_in_async.symbols = async_methods
+dotnet_naming_rule.async_methods_end_in_async.style = async_suffixed_pascal_case
+dotnet_naming_rule.async_methods_end_in_async.severity = suggestion
+
+# ---------------------------------------------------------------------------------------------
+# Analyser severities
+#
+# These DO reach the build, and TreatWarningsAsErrors turns every one of them into a build
+# failure. Anything raised here is a deliberate gate, not a preference.
+# ---------------------------------------------------------------------------------------------
+
+# ConfigureAwait(false) is the wrong default in ASP.NET Core: there is no synchronisation
+# context to capture, so the call is noise on every await in the codebase.
+dotnet_diagnostic.CA2007.severity = none
+
+# CultureInfo must be explicit. FTMS formats and parses money and dates, and an implicit
+# current-culture conversion is exactly how a decimal separator becomes a production incident.
+dotnet_diagnostic.CA1305.severity = warning
+dotnet_diagnostic.CA1304.severity = warning
+dotnet_diagnostic.CA1310.severity = warning
+
+# Do not swallow the original exception when rethrowing: the audit trail depends on stack traces.
+dotnet_diagnostic.CA2200.severity = warning
+
+# Dispose correctness. The DbContext and the audit interceptor own real resources.
+# Turned off again for tests/ below: the analyser cannot see async disposal.
+dotnet_diagnostic.CA2213.severity = warning
+
+# Documentation comments are not required. The design docs carry the reasoning and the
+# `// design: doc NN` comments carry the pointer; XML docs on every member would be ceremony.
+dotnet_diagnostic.CS1591.severity = none
+
+# ---------------------------------------------------------------------------------------------
+# Test projects
+#
+# Test code is production code in every way that matters, with two exceptions worth naming.
+# ---------------------------------------------------------------------------------------------
+[tests/**/*.cs]
+
+# Test method names are sentences — Delete_OnAnInactiveTransaction_Fails — and read far better
+# than any conforming identifier would.
+dotnet_naming_rule.non_field_members_are_pascal_case.severity = none
+
+# xUnit constructs test classes by reflection, so "unused" private fields and unreferenced
+# constructor parameters are normal in fixtures.
+dotnet_diagnostic.CA1707.severity = none
+
+# CA2213 recognises only the synchronous IDisposable.Dispose pattern. xUnit fixtures dispose
+# through IAsyncLifetime.DisposeAsync instead, so the rule reports every Testcontainers fixture
+# as leaking — see FtmsApiFactory, which disposes both fields correctly and was flagged anyway.
+# The rule stays a build gate in src/, where the DbContext and the audit interceptor live.
+dotnet_diagnostic.CA2213.severity = none

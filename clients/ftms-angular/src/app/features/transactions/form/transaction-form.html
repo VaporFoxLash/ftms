@@ -3,7 +3,7 @@
     <h1 class="form-page__title">
       {{ isEdit() ? 'Edit transaction' : 'Capture transaction' }}
     </h1>
-    <a class="button button--link" routerLink="/transactions">Back to list</a>
+    <a z-button zType="link" routerLink="/transactions">Back to list</a>
   </header>
 
   @if (loading()) {
@@ -20,7 +20,7 @@
     <form class="form" [formGroup]="form" (ngSubmit)="save()" novalidate>
       <label class="field">
         <span class="field__label">Transaction date</span>
-        <input class="field__control" type="datetime-local" formControlName="transactionDate" />
+        <input z-input type="datetime-local" formControlName="transactionDate" />
         @if (
           form.controls.transactionDate.touched && form.controls.transactionDate.errors;
           as errors
@@ -35,20 +35,24 @@
         }
       </label>
 
-      <label class="field">
-        <span class="field__label">Type</span>
-        <select class="field__control" formControlName="transactionType">
+      <div class="field">
+        <span class="field__label" id="transaction-type-label">Type</span>
+        <z-select
+          formControlName="transactionType"
+          zPlaceholder="Choose a type"
+          zLabelledBy="transaction-type-label"
+        >
           @for (type of types; track type) {
-            <option [value]="type">{{ type }}</option>
+            <z-select-item [zValue]="type">{{ type }}</z-select-item>
           }
-        </select>
+        </z-select>
         @if (
           form.controls.transactionType.touched && form.controls.transactionType.errors;
           as errors
         ) {
           <span class="field__error">{{ errors['server'] ?? 'Choose a transaction type.' }}</span>
         }
-      </label>
+      </div>
 
       <label class="field">
         <span class="field__label">
@@ -58,7 +62,7 @@
           }
         </span>
         <input
-          class="field__control"
+          z-input
           type="number"
           step="0.01"
           min="0.01"
@@ -88,7 +92,8 @@
           }
         </span>
         <input
-          class="field__control field__control--short"
+          z-input
+          class="max-w-28"
           type="text"
           maxlength="3"
           autocomplete="off"
@@ -106,8 +111,8 @@
       </label>
 
       <div class="form__actions">
-        <a class="button" routerLink="/transactions">Cancel</a>
-        <button class="button button--primary" type="submit" [disabled]="saving() || !isEditable()">
+        <a z-button zType="outline" routerLink="/transactions">Cancel</a>
+        <button z-button type="submit" [disabled]="saving() || !isEditable()">
           {{ saving() ? 'Saving…' : isEdit() ? 'Save changes' : 'Capture' }}
         </button>
       </div>

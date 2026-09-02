@@ -19,6 +19,24 @@ public enum ErrorType
 
     /// <summary>An illegal state transition or a concurrency clash. 409.</summary>
     Conflict = 3,
+
+    /// <summary>
+    /// The caller could not be authenticated. 401.
+    ///
+    /// Deliberately distinct from <see cref="Failure"/>: a bad password is an expected outcome
+    /// of a login attempt, not an internal error, and it must not be logged or reported as one.
+    /// design: doc 06 section 3.
+    /// </summary>
+    Unauthorized = 4,
+
+    /// <summary>
+    /// The account exists but is locked out after repeated failures. 423.
+    ///
+    /// Separate from <see cref="Unauthorized"/> because the user needs to be told to wait rather
+    /// than to retype, and because telling them so only ever happens after the password has
+    /// already been checked - so it leaks nothing an attacker did not already establish.
+    /// </summary>
+    Locked = 5,
 }
 
 /// <summary>
@@ -42,6 +60,12 @@ public record Error(string Code, string Message)
 
     public static Error Failure(string code, string message) =>
         new(code, message) { Type = ErrorType.Failure };
+
+    public static Error Unauthorized(string code, string message) =>
+        new(code, message) { Type = ErrorType.Unauthorized };
+
+    public static Error Locked(string code, string message) =>
+        new(code, message) { Type = ErrorType.Locked };
 }
 
 /// <summary>

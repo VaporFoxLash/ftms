@@ -2,8 +2,8 @@
   position: absolute;
   left: -9999px;
   top: 0;
-  background: #1e293b;
-  color: #fff;
+  background: var(--ftms-ink);
+  color: var(--ftms-surface);
   padding: 0.5rem 1rem;
   z-index: 100;
 
@@ -17,27 +17,45 @@
   align-items: center;
   gap: 1.5rem;
   padding: 0.85rem 1.5rem;
-  border-bottom: 1px solid #e2e8f0;
-  background: #fff;
+  border-bottom: 1px solid var(--ftms-border);
+  background: var(--ftms-surface);
 }
 
 .shell__brand {
   display: flex;
-  align-items: baseline;
-  gap: 0.6rem;
+  align-items: center;
+  gap: 0.7rem;
   text-decoration: none;
   color: inherit;
+}
+
+// Height-constrained, width auto: the logo keeps its own aspect ratio whatever crop of the
+// artwork ends up in public/, so a squarer or wider file cannot distort or blow up the header.
+.shell__brand-logo {
+  height: 2rem;
+  width: auto;
+  display: block;
 }
 
 .shell__brand-mark {
   font-weight: 700;
   letter-spacing: 0.06em;
-  color: #1d4ed8;
+  color: var(--ftms-brand);
 }
 
 .shell__brand-name {
-  color: #64748b;
+  color: var(--ftms-ink-subtle);
   font-size: 0.9rem;
+
+  // The full system name is long enough to wrap to two lines mid-phrase, which would push the
+  // header taller and misalign the logo beside it. Below the breakpoint it is dropped entirely
+  // rather than truncated: the G4S mark still identifies the app, and half a name reads worse
+  // than none.
+  white-space: nowrap;
+
+  @media (width < 60rem) {
+    display: none;
+  }
 }
 
 .shell__nav {
@@ -46,14 +64,14 @@
   flex: 1;
 
   a {
-    color: #334155;
+    color: var(--ftms-ink-muted);
     text-decoration: none;
     padding: 0.25rem 0;
     border-bottom: 2px solid transparent;
 
     &.is-active {
-      border-bottom-color: #1d4ed8;
-      color: #1d4ed8;
+      border-bottom-color: var(--ftms-brand);
+      color: var(--ftms-brand);
     }
   }
 }
@@ -66,7 +84,31 @@
 
 .shell__user {
   font-size: 0.9rem;
-  color: #475569;
+  color: var(--ftms-ink-muted);
+}
+
+// The one place in the app that does NOT use z-button, and the exception is measured rather
+// than assumed. App is eagerly loaded, so anything it imports lands in the initial bundle -
+// and ZardButtonComponent pulls @ng-icons/core and @ng-icons/lucide onto the critical path for
+// a loading spinner these two links never show. That cost 39.5 kB of the 400 kB initial budget
+// (428.77 -> 389.24 measured), to style two text links in the header.
+//
+// Everything below the shell is lazily routed, so z-button there costs a shared lazy chunk
+// rather than first paint. Sign in and Sign out are chrome, not controls, and they are styled
+// here as chrome.
+.shell__action {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--primary);
+  cursor: pointer;
+  text-underline-offset: 4px;
+
+  &:hover,
+  &:focus-visible {
+    text-decoration: underline;
+  }
 }
 
 .shell__main {
@@ -92,8 +134,8 @@
   padding: 0.7rem 0.9rem;
   border-radius: 8px;
   border: 1px solid;
-  box-shadow: 0 10px 25px rgb(15 23 42 / 12%);
-  background: #fff;
+  box-shadow: 0 10px 25px rgb(0 0 0 / 10%);
+  background: var(--ftms-surface);
 }
 
 .toast__body {
@@ -107,7 +149,7 @@
 
 .toast__detail {
   font-size: 0.82rem;
-  color: #475569;
+  color: var(--ftms-ink-muted);
 }
 
 .toast__close {
@@ -116,20 +158,20 @@
   font-size: 1.1rem;
   line-height: 1;
   cursor: pointer;
-  color: #64748b;
+  color: var(--ftms-ink-subtle);
 }
 
 .toast--error {
-  border-color: #fca5a5;
-  background: #fef2f2;
+  border-color: var(--ftms-danger-border);
+  background: var(--ftms-danger-tint);
 }
 
 .toast--success {
-  border-color: #86efac;
-  background: #f0fdf4;
+  border-color: var(--ftms-success-border);
+  background: var(--ftms-success-bg);
 }
 
 .toast--info {
-  border-color: #93c5fd;
-  background: #eff6ff;
+  border-color: var(--ftms-info-border);
+  background: var(--ftms-info-bg);
 }

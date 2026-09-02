@@ -19,9 +19,18 @@ export default defineConfig({
   // pipeline trains people to ignore red. Retry once in CI to absorb genuine infrastructure
   // blips, never locally, where the blip should be investigated.
   retries: process.env['CI'] ? 1 : 0,
+
+  // A stray .only would silently reduce the suite to one test and still report green.
+  forbidOnly: !!process.env['CI'],
   workers: process.env['CI'] ? 1 : undefined,
 
-  reporter: process.env['CI'] ? [['list'], ['html', { open: 'never' }]] : 'list',
+  // The json report exists so CI can assert that the journeys actually RAN. This suite spent a
+  // long time as test.skip(true, ...) and a green tick said nothing about it either way; a skip
+  // and a pass look identical in a summary line. The integration suite has the same guard
+  // against outcome="NotExecuted" for the same reason.
+  reporter: process.env['CI']
+    ? [['list'], ['html', { open: 'never' }], ['json', { outputFile: 'playwright-report/results.json' }]]
+    : 'list',
 
   use: {
     baseURL: process.env['FTMS_E2E_BASE_URL'] ?? 'http://localhost:4200',

@@ -28,7 +28,14 @@ internal sealed class UpdateTransactionHandler(
         // Failed so the user refetches and reapplies. Checking here catches the ordinary case
         // cheaply; the rowversion concurrency token in the database catches the race between
         // this comparison and the save, surfacing as ConcurrencyConflictException.
-        if (!transaction.RowVersion.SequenceEqual(command.RowVersion))
+        //
+        // Skipped entirely when the caller sent no If-Match. Worth being clear eyed about what
+        // that means: this is not a weaker check, it is NO check. The entity was loaded fresh a
+        // few lines above, so its RowVersion is current by construction and the database token
+        // has nothing stale to catch either. A caller who omits the header will overwrite a
+        // concurrent edit and be told it succeeded.
+        if (command.RowVersion is { Length: > 0 } expected
+            && !transaction.RowVersion.SequenceEqual(expected))
         {
             return Result.Failure<Unit>(DomainErrors.Transaction.ConcurrencyConflict);
         }

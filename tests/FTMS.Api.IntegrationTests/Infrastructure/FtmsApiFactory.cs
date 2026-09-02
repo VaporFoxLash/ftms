@@ -71,9 +71,24 @@ public sealed class FtmsApiFactory : WebApplicationFactory<Program>, IAsyncLifet
         {
             DbAdapter = DbAdapter.SqlServer,
 
-            // The seeded statuses are migration output, not test data. Wiping them would break
-            // every foreign key and force each test to reseed. design: doc 02 section 4.
-            TablesToIgnore = ["TransactionStatuses", "__EFMigrationsHistory"],
+            // Seeded reference data, not test data. Wiping any of it would break foreign keys
+            // and force each test to reseed.
+            //
+            // TransactionStatuses and AspNetRoles are migration output (doc 02 section 4, doc 06
+            // section 3). AspNetUsers and AspNetUserRoles are written once by IdentitySeeder when
+            // the host starts, and the host starts once for the whole assembly - so wiping them
+            // between tests would leave every test after the first with nobody to sign in as.
+            //
+            // RefreshTokens is deliberately NOT in this list: sessions are test data, and each
+            // test should begin with none.
+            TablesToIgnore =
+            [
+                "TransactionStatuses",
+                "AspNetRoles",
+                "AspNetUsers",
+                "AspNetUserRoles",
+                "__EFMigrationsHistory",
+            ],
         });
     }
 
@@ -100,8 +115,8 @@ public sealed class FtmsApiFactory : WebApplicationFactory<Program>, IAsyncLifet
                     ?? "Server=(unavailable);Database=Ftms;Trusted_Connection=True",
                 ["Jwt:Issuer"] = "https://ftms.tests",
                 ["Jwt:Audience"] = "ftms-api",
-                ["Jwt:DevelopmentSigningKey"] = TestTokens.SigningKey,
-            }));
+                ["Jwt:SigningKey"] = TestTokens.SigningKey,
+            }.Concat(TestUsers.SeedConfiguration()).ToDictionary()));
     }
 
     async Task IAsyncLifetime.DisposeAsync()

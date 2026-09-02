@@ -11,7 +11,7 @@
 }
 
 .form-page__loading {
-  color: #64748b;
+  color: var(--ftms-ink-subtle);
 }
 
 .form {
@@ -36,7 +36,7 @@
 }
 
 .notice--warning {
-  background: #fef3c7;
-  border: 1px solid #fcd34d;
-  color: #713f12;
+  background: var(--ftms-notice-bg);
+  border: 1px solid var(--ftms-notice-border);
+  color: var(--ftms-notice-ink);
 }

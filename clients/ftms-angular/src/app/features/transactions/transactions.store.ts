@@ -18,6 +18,10 @@ export const MAX_PAGE_SIZE = 200;
 
 export const DEFAULT_PAGE_SIZE = 50;
 
+/** design: doc 05 section 3 - called bare the endpoint returns Active only, and the screen
+ *  opens on the same default so the two never disagree about what "the list" means. */
+export const DEFAULT_STATUS = 'Active';
+
 /** The sort fields the API is willing to order by; anything else is a 400. */
 export const SORTABLE_FIELDS = [
   'transactionDate',
@@ -92,9 +96,7 @@ export class TransactionsStore {
   private readonly loadedAt = signal<number | null>(null);
   private readonly fromCache = signal(false);
   private readonly query = signal<ListQuery>({
-    // design: doc 05 section 3 - called bare the endpoint returns Active only, and the screen
-    // opens on the same default so the two never disagree about what "the list" means.
-    status: 'Active',
+    status: DEFAULT_STATUS,
     page: 1,
     pageSize: DEFAULT_PAGE_SIZE,
     sortBy: 'transactionDate',
@@ -191,6 +193,35 @@ export class TransactionsStore {
     this.query.update((current) => ({ ...current, status, page: 1 }));
     await this.load();
   }
+
+  /**
+   * Back to the opening view: default status, page size, sort and page one.
+   *
+   * One update and one load, rather than calling the individual setters in sequence - each of
+   * those loads, so clearing four filters would fire four requests and paint three lists the
+   * user never asked to see.
+   */
+  async resetFilters(): Promise<void> {
+    this.query.set({
+      status: DEFAULT_STATUS,
+      page: 1,
+      pageSize: DEFAULT_PAGE_SIZE,
+      sortBy: 'transactionDate',
+      sortDir: 'desc',
+    });
+    await this.load();
+  }
+
+  /** True when the list is showing exactly what it shows on open, so there is nothing to clear. */
+  readonly isDefaultQuery = computed(() => {
+    const q = this.query();
+    return (
+      q.status === DEFAULT_STATUS &&
+      q.pageSize === DEFAULT_PAGE_SIZE &&
+      q.sortBy === 'transactionDate' &&
+      q.sortDir === 'desc'
+    );
+  });
 
   async setSort(sortBy: SortField, sortDir: 'asc' | 'desc'): Promise<void> {
     this.query.update((current) => ({ ...current, sortBy, sortDir, page: 1 }));

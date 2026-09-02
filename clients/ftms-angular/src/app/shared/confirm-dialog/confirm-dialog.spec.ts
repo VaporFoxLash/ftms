@@ -21,7 +21,7 @@ describe('ConfirmDialog', () => {
 
   const open = (data: Partial<ConfirmDialogData> & { onConfirm: () => Promise<void> }) =>
     host.dialog.open<boolean>(ConfirmDialog, {
-      data: { message: 'Archive this?', ...data } satisfies ConfirmDialogData,
+      data: { message: 'Delete this?', ...data } satisfies ConfirmDialogData,
 
       // Mirrors what TransactionList passes, so the test exercises the real configuration
       // rather than the CDK defaults.
@@ -64,24 +64,24 @@ describe('ConfirmDialog', () => {
 
   it('renders the caller supplied message and labels', () => {
     open({
-      title: 'Archive this transaction?',
-      confirmLabel: 'Archive',
+      title: 'Delete this transaction?',
+      confirmLabel: 'Delete',
       onConfirm: async () => {},
     });
     fixture.detectChanges();
 
-    expect(overlayText()).toContain('Archive this transaction?');
-    expect(overlayText()).toContain('Archive this?');
-    expect(buttonLabelled('Archive')).toBeDefined();
+    expect(overlayText()).toContain('Delete this transaction?');
+    expect(overlayText()).toContain('Delete this?');
+    expect(buttonLabelled('Delete')).toBeDefined();
   });
 
   it('runs the handler and closes with true when confirmed', async () => {
     const onConfirm = vi.fn().mockResolvedValue(undefined);
-    const ref = open({ confirmLabel: 'Archive', onConfirm });
+    const ref = open({ confirmLabel: 'Delete', onConfirm });
     fixture.detectChanges();
 
     const closed = firstValueFrom(ref.closed);
-    buttonLabelled('Archive')!.click();
+    buttonLabelled('Delete')!.click();
     fixture.detectChanges();
 
     await expect(closed).resolves.toBe(true);
@@ -89,22 +89,22 @@ describe('ConfirmDialog', () => {
   });
 
   it('stays open when the handler rejects, so the user can retry', async () => {
-    // design: doc 05 section 6 - a failed archive is usually a 412 telling the user someone
+    // design: doc 05 section 6 - a failed delete is usually a 412 telling the user someone
     // else changed the record. Closing would make them find the row again to try once more.
     const onConfirm = vi.fn().mockRejectedValue(new Error('412'));
-    const ref = open({ confirmLabel: 'Archive', onConfirm });
+    const ref = open({ confirmLabel: 'Delete', onConfirm });
     fixture.detectChanges();
 
     let closedWith: boolean | undefined | symbol = Symbol('still open');
     ref.closed.subscribe((value) => (closedWith = value));
 
-    buttonLabelled('Archive')!.click();
+    buttonLabelled('Delete')!.click();
     await Promise.resolve();
     await Promise.resolve();
     fixture.detectChanges();
 
     expect(typeof closedWith).toBe('symbol');
-    expect(buttonLabelled('Archive')).toBeDefined();
+    expect(buttonLabelled('Delete')).toBeDefined();
   });
 
   it('shows progress and blocks a second click while the handler is in flight', async () => {
@@ -115,10 +115,10 @@ describe('ConfirmDialog', () => {
       }),
     );
 
-    open({ confirmLabel: 'Archive', onConfirm });
+    open({ confirmLabel: 'Delete', onConfirm });
     fixture.detectChanges();
 
-    buttonLabelled('Archive')!.click();
+    buttonLabelled('Delete')!.click();
     await Promise.resolve();
     fixture.detectChanges();
 
@@ -127,7 +127,7 @@ describe('ConfirmDialog', () => {
     expect(working!.disabled).toBe(true);
     expect(buttonLabelled('Cancel')!.disabled).toBe(true);
 
-    // A double click must not archive twice.
+    // A double click must not delete twice.
     working!.click();
     expect(onConfirm).toHaveBeenCalledOnce();
 
@@ -163,7 +163,7 @@ describe('ConfirmDialog', () => {
   });
 
   it('refuses to be dismissed by Escape while the handler is in flight', async () => {
-    // Ours, not the CDK's. A half finished archive dismissed by a stray Escape would look to
+    // Ours, not the CDK's. A half finished delete dismissed by a stray Escape would look to
     // the user as though nothing happened, while the write completed underneath.
     let release!: () => void;
     const onConfirm = vi.fn().mockReturnValue(
@@ -172,10 +172,10 @@ describe('ConfirmDialog', () => {
       }),
     );
 
-    open({ confirmLabel: 'Archive', onConfirm });
+    open({ confirmLabel: 'Delete', onConfirm });
     fixture.detectChanges();
 
-    buttonLabelled('Archive')!.click();
+    buttonLabelled('Delete')!.click();
     await Promise.resolve();
     fixture.detectChanges();
 

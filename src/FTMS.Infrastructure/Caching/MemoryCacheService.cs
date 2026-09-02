@@ -21,8 +21,13 @@ internal sealed class MemoryCacheService(IMemoryCache cache) : ICacheService
     /// Every key currently believed to be in the cache. A ConcurrentDictionary used as a set,
     /// because IMemoryCache can evict under memory pressure without telling us, so this is a
     /// superset. A stale entry here costs one wasted removal, never a stale read.
+    ///
+    /// Instance, not static. As a static it was shared by every instance in the PROCESS while the
+    /// IMemoryCache it describes was not - so two hosts in one process (which is exactly what the
+    /// integration tests are) would each invalidate against the other's key register, and one
+    /// suite could leave the other believing it had cached keys it never wrote.
     /// </summary>
-    private static readonly ConcurrentDictionary<string, byte> KnownKeys = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, byte> knownKeys = new(StringComparer.Ordinal);
 
     public async Task<T?> GetOrCreateAsync<T>(
         string key,
@@ -49,7 +54,7 @@ internal sealed class MemoryCacheService(IMemoryCache cache) : ICacheService
             AbsoluteExpirationRelativeToNow = expiration,
         });
 
-        KnownKeys.TryAdd(key, 0);
+        knownKeys.TryAdd(key, 0);
 
         return created;
     }
@@ -57,12 +62,12 @@ internal sealed class MemoryCacheService(IMemoryCache cache) : ICacheService
     public void Remove(string key)
     {
         cache.Remove(key);
-        KnownKeys.TryRemove(key, out _);
+        knownKeys.TryRemove(key, out _);
     }
 
     public void RemoveByPrefix(string prefix)
     {
-        foreach (var key in KnownKeys.Keys.Where(key => key.StartsWith(prefix, StringComparison.Ordinal)))
+        foreach (var key in knownKeys.Keys.Where(key => key.StartsWith(prefix, StringComparison.Ordinal)))
         {
             Remove(key);
         }

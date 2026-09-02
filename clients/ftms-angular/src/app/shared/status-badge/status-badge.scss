@@ -11,39 +11,42 @@
 
 // Working states read as live.
 .badge--active {
-  background: #dcfce7;
-  color: #14532d;
-  border-color: #86efac;
+  background: var(--ftms-status-active-bg);
+  color: var(--ftms-status-active-ink);
+  border-color: var(--ftms-status-active-border);
 }
 
 .badge--pending {
-  background: #fef3c7;
-  color: #713f12;
-  border-color: #fcd34d;
+  background: var(--ftms-status-pending-bg);
+  color: var(--ftms-status-pending-ink);
+  border-color: var(--ftms-status-pending-border);
 }
 
 // Terminal outcomes read as settled.
 .badge--completed {
-  background: #dbeafe;
-  color: #1e3a8a;
-  border-color: #93c5fd;
+  background: var(--ftms-status-completed-bg);
+  color: var(--ftms-status-completed-ink);
+  border-color: var(--ftms-status-completed-border);
 }
 
+// Cancelled was red until the brand claimed red. Black instead - and arguably better for it:
+// a cancelled transaction is terminated, not dangerous, and near-black reads as final.
 .badge--cancelled {
-  background: #fee2e2;
-  color: #7f1d1d;
-  border-color: #fca5a5;
+  background: var(--ftms-status-cancelled-bg);
+  color: var(--ftms-status-cancelled-ink);
+  border-color: var(--ftms-status-cancelled-border);
 }
 
-// Archived: visibly quieter than everything else.
+// Archived: visibly quieter than everything else, including Cancelled. The two are adjacent in
+// meaning and must not be adjacent in weight.
 .badge--inactive {
-  background: #f1f5f9;
-  color: #475569;
-  border-color: #cbd5e1;
+  background: var(--ftms-status-inactive-bg);
+  color: var(--ftms-status-inactive-ink);
+  border-color: var(--ftms-status-inactive-border);
 }
 
 .badge--unknown {
-  background: #ede9fe;
-  color: #4c1d95;
-  border-color: #c4b5fd;
+  background: var(--ftms-status-unknown-bg);
+  color: var(--ftms-status-unknown-ink);
+  border-color: var(--ftms-status-unknown-border);
 }

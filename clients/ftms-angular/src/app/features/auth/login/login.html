@@ -1,38 +1,32 @@
 <section class="login">
   <h1 class="login__title">Sign in to FTMS</h1>
 
-  <p class="notice notice--warning" role="note">
-    <strong>Development sign in.</strong> This verifies nothing and issues whatever role you pick.
-    It exists so the stack runs end to end before ASP.NET Core Identity lands (design doc 06), and
-    it is removed with the API's <code>/api/dev/token</code> endpoint.
-  </p>
-
   <form class="form" [formGroup]="form" (ngSubmit)="signIn()" novalidate>
+    @if (failure(); as message) {
+      <!-- role="alert" so a screen reader announces the failure rather than leaving the user
+           wondering why nothing happened when they pressed the button. -->
+      <p class="login__error" role="alert">{{ message }}</p>
+    }
+
     <label class="field">
       <span class="field__label">User name</span>
       <input
-        class="field__control"
+        z-input
         type="text"
         autocomplete="username"
+        autocapitalize="none"
+        spellcheck="false"
         formControlName="userName"
       />
     </label>
 
     <label class="field">
-      <span class="field__label">Role</span>
-      <select class="field__control" formControlName="role">
-        @for (role of roles; track role) {
-          <option [value]="role">{{ role }}</option>
-        }
-      </select>
-      <span class="field__hint">
-        Capturer creates and updates. Manager adds archiving. Auditor is read only. Admin has no
-        transaction rights at all, by design.
-      </span>
+      <span class="field__label">Password</span>
+      <input z-input type="password" autocomplete="current-password" formControlName="password" />
     </label>
 
     <div class="form__actions">
-      <button class="button button--primary" type="submit" [disabled]="busy()">
+      <button z-button type="submit" [disabled]="busy()">
         {{ busy() ? 'Signing in…' : 'Sign in' }}
       </button>
     </div>

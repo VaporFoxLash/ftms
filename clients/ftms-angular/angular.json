@@ -10,12 +10,12 @@
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
-          "style": "scss"
+          "style": "css"
         }
       },
       "root": "",
       "sourceRoot": "src",
-      "prefix": "app",
+      "prefix": "ftms",
       "architect": {
         "build": {
           "builder": "@angular/build:application",
@@ -31,7 +31,7 @@
             ],
             "styles": [
               "@angular/cdk/overlay-prebuilt.css",
-              "src/styles.scss"
+              "src/styles.css"
             ]
           },
           "configurations": {
@@ -45,8 +45,8 @@
                 {
                   "type": "bundle",
                   "name": "styles",
-                  "maximumWarning": "20kB",
-                  "maximumError": "40kB"
+                  "maximumWarning": "64kB",
+                  "maximumError": "96kB"
                 },
                 {
                   "type": "anyComponentStyle",

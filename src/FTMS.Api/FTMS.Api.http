@@ -1,6 +1,174 @@
-@FTMS.Api_HostAddress = http://localhost:5198
+### FTMS API - a working request collection.
+###
+### Run the API first (dotnet run --project src/FTMS.Api), then send these top to bottom.
+### Requests 3 onwards need the token from request 2, which is captured automatically.
+###
+### Works in Visual Studio, VS Code (REST Client extension) and Rider.
 
-GET {{FTMS.Api_HostAddress}}/weatherforecast/
+@host = http://localhost:5150
+
+### Every endpoint except login, refresh and health requires a bearer token.
+### Expect 401.
+GET {{host}}/api/transactions
 Accept: application/json
 
+### 1. Health. The only other anonymous endpoint.
+GET {{host}}/health
+
+### 2. Sign in.
+### Four accounts are seeded in Development, one per role:
+###   capturer / Capturer#2026   - create and update
+###   manager  / Manager#2026    - everything Capturer can do, plus delete
+###   auditor  / Auditor#2026    - read only
+###   admin    / Admin#2026!x    - user administration, and NO transaction rights by design
 ###
+### The response body carries the access token. The refresh token is NOT in the body - it comes
+### back as an httpOnly cookie, which is what stops a script from ever reading it.
+# @name signIn
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "userName": "manager",
+  "password": "Manager#2026"
+}
+
+### Everything below reuses the token from the response above.
+@token = {{signIn.response.body.accessToken}}
+
+### 3. Who am I? Useful for checking which roles a token actually carries.
+GET {{host}}/api/auth/me
+Authorization: Bearer {{token}}
+
+### 4. All transaction statuses. The brief's GET /api/transactionstatuses.
+GET {{host}}/api/transactionstatuses
+Authorization: Bearer {{token}}
+Accept: application/json
+
+### 5. Active transactions. The brief's GET /api/transactions.
+### Called bare it returns Active only, which is what the brief asks for. The query parameters
+### are additive: paging, sorting and an explicit status filter.
+GET {{host}}/api/transactions
+Authorization: Bearer {{token}}
+Accept: application/json
+
+### 5b. The same list, paged and sorted.
+GET {{host}}/api/transactions?page=1&pageSize=10&sortBy=amount&sortDirection=desc
+Authorization: Bearer {{token}}
+Accept: application/json
+
+### 5c. Inactive transactions, to see soft deleted rows still in the database.
+GET {{host}}/api/transactions?status=Inactive
+Authorization: Bearer {{token}}
+Accept: application/json
+
+### 6. Create. The brief's POST /api/transactions.
+### The server assigns the id, sets the status to Active, and stamps CreatedAtUtc - none of them
+### are inputs. currencyCode is optional and defaults to ZAR.
+### Responds 201 with a Location header and an ETag.
+# @name create
+POST {{host}}/api/transactions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "transactionDate": "2026-08-20T09:30:00Z",
+  "transactionType": "Deposit",
+  "amount": 1500.00,
+  "currencyCode": "ZAR"
+}
+
+###
+@id = {{create.response.body.id}}
+@etag = {{create.response.headers.ETag}}
+
+### 7. Get one by id. The brief's GET /api/transactions/{id}.
+### Returns a transaction in ANY status, including Inactive, because this endpoint is the audit
+### window. Carries an ETag for the update below.
+GET {{host}}/api/transactions/{{id}}
+Authorization: Bearer {{token}}
+Accept: application/json
+
+### 8. Update. The brief's PUT /api/transactions/{id}.
+### Only transactionDate and transactionType are modifiable - amount, currency and status are not
+### on the contract at all, so they cannot even be attempted.
+###
+### If-Match is OPTIONAL. Without it this is last-write-wins, which is what the brief describes.
+PUT {{host}}/api/transactions/{{id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "transactionDate": "2026-08-21T10:00:00Z",
+  "transactionType": "Transfer"
+}
+
+### 8b. The same update, done safely.
+### Sending the ETag makes it a compare-and-swap: if somebody else changed the row since you read
+### it, you get 412 instead of silently overwriting them. Real clients should do this - the
+### Angular client always does.
+PUT {{host}}/api/transactions/{{id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+If-Match: {{etag}}
+
+{
+  "transactionDate": "2026-08-22T11:15:00Z",
+  "transactionType": "Payment"
+}
+
+### 8c. A deliberately stale ETag. Expect 412 Precondition Failed, and nothing changed.
+PUT {{host}}/api/transactions/{{id}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+If-Match: "AAAAAAAAAAE="
+
+{
+  "transactionDate": "2026-08-23T08:00:00Z",
+  "transactionType": "Withdrawal"
+}
+
+### 9. Delete. The brief's DELETE /api/transactions/{id}.
+### Does NOT remove the row. It moves TransactionStatusId to Inactive and leaves everything else
+### in place. Requires the Manager role - a Capturer token gets 403 here.
+### Idempotent: send it twice and both return 204.
+DELETE {{host}}/api/transactions/{{id}}
+Authorization: Bearer {{token}}
+
+### 9b. Proof the row survived. Status should read "Inactive".
+GET {{host}}/api/transactions/{{id}}
+Authorization: Bearer {{token}}
+Accept: application/json
+
+### 10. Validation. Expect 400 with a per field errors dictionary.
+POST {{host}}/api/transactions
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "transactionDate": "2026-08-20T09:30:00Z",
+  "transactionType": "NotAType",
+  "amount": -5,
+  "currencyCode": "RANDS"
+}
+
+### 11. Separation of duty. Sign in as Admin, then try to read transactions.
+### Expect 403: administering the system and moving money through it are different jobs.
+# @name signInAdmin
+POST {{host}}/api/auth/login
+Content-Type: application/json
+
+{
+  "userName": "admin",
+  "password": "Admin#2026!x"
+}
+
+###
+GET {{host}}/api/transactions
+Authorization: Bearer {{signInAdmin.response.body.accessToken}}
+
+### 12. Sign out. Revokes the refresh token so the session cannot be renewed.
+### The access token stays valid for its remaining minutes - it cannot be revoked, which is
+### exactly why it only lasts fifteen.
+POST {{host}}/api/auth/logout
+Authorization: Bearer {{token}}

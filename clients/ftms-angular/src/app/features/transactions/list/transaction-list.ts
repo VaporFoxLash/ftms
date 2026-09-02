@@ -23,11 +23,15 @@ import { ConfirmDialog, ConfirmDialogData } from '../../../shared/confirm-dialog
 import { Paging } from '../../../shared/paging/paging';
 import { StatusBadge } from '../../../shared/status-badge/status-badge';
 import {
+  DEFAULT_PAGE_SIZE,
+  DEFAULT_STATUS,
   SORTABLE_FIELDS,
   SORT_FIELD_LABELS,
   SortField,
   TransactionsStore,
 } from '../transactions.store';
+import { ZardSelectImports } from '@/shared/components/select/select.imports';
+import { ZardButtonComponent } from '@/shared/components/button/button.component';
 
 /**
  * Row height in pixels.
@@ -40,6 +44,15 @@ export const ROW_HEIGHT_PX = 44;
 
 /** How often the "updated Ns ago" label recomputes. */
 const FRESHNESS_TICK_MS = 10_000;
+
+/**
+ * Value of the "Clear filters" entry in the status dropdown.
+ *
+ * The select carries statuses, so this entry has to be a value too. It is prefixed and bracketed
+ * to keep it outside the space of anything the API could ever return as a status name - the
+ * handler swallows it before it can reach setStatus.
+ */
+const CLEAR_FILTERS = '__clear-filters__';
 
 /**
  * The transactions screen. design: doc 07 section 5 - this is the hot path.
@@ -56,6 +69,8 @@ const FRESHNESS_TICK_MS = 10_000;
     ScrollingModule,
     StatusBadge,
     Paging,
+    ZardSelectImports,
+    ZardButtonComponent,
   ],
   providers: [TransactionsStore],
   templateUrl: './transaction-list.html',
@@ -72,7 +87,17 @@ export class TransactionList implements OnInit {
   protected readonly sortFieldLabels = SORT_FIELD_LABELS;
   protected readonly rowHeight = ROW_HEIGHT_PX;
 
-  protected readonly statusFilter = new FormControl<string>('Active', { nonNullable: true });
+  protected readonly statusFilter = new FormControl<string>(DEFAULT_STATUS, { nonNullable: true });
+
+  /** Exposed for the template's "Clear filters" entry in the status dropdown. */
+  protected readonly clearFiltersValue = CLEAR_FILTERS;
+
+  // The select speaks strings, the store counts rows. The control is the string side of that
+  // boundary and the subscription below is where it converts, so nothing downstream sees it.
+  protected readonly pageSizes = [25, 50, 100, 200] as const;
+  protected readonly pageSizeControl = new FormControl<string>(String(DEFAULT_PAGE_SIZE), {
+    nonNullable: true,
+  });
 
   /** The grid wrapper, so focus has somewhere to land when the opener is archived away. */
   private readonly grid = viewChild<ElementRef<HTMLElement>>('grid');
@@ -114,7 +139,20 @@ export class TransactionList implements OnInit {
     // as the debounce: re-selecting the value already applied should cost nothing.
     this.statusFilter.valueChanges
       .pipe(debounceTime(300), distinctUntilChanged(), takeUntilDestroyed())
-      .subscribe((status) => void this.store.setStatus(status));
+      .subscribe((status) => {
+        // "Clear filters" rides in on the same control as the statuses, so it is intercepted
+        // here and never reaches setStatus - which would send __clear-filters__ to the API.
+        if (status === CLEAR_FILTERS) {
+          void this.clearFilters();
+          return;
+        }
+
+        void this.store.setStatus(status);
+      });
+
+    this.pageSizeControl.valueChanges
+      .pipe(distinctUntilChanged(), takeUntilDestroyed())
+      .subscribe((size) => this.store.setPageSize(Number(size)));
 
     const ticker = setInterval(() => this.tick.update((value) => value + 1), FRESHNESS_TICK_MS);
     this.destroyRef.onDestroy(() => clearInterval(ticker));
@@ -133,6 +171,35 @@ export class TransactionList implements OnInit {
    * cost us this.
    */
   protected trackById = (_: number, transaction: TransactionDto): string => transaction.id;
+
+  /**
+   * The tail of the id, which is the half worth showing.
+   *
+   * The brief asks for Id in the grid, and a full 36 character GUID would take a third of the
+   * width and crowd out the columns people actually scan. So it is truncated - but to the LAST
+   * segment, not the first, and that is not a stylistic choice.
+   *
+   * These ids are GUIDv7 (Guid.CreateVersion7 on the server), whose leading 48 bits are a
+   * millisecond timestamp. Rows captured within about a minute of each other therefore share
+   * their first eight hex characters, so the conventional prefix truncation would render most of
+   * a freshly seeded list as visually identical strings. The trailing segment is random, so it
+   * discriminates. The full value is on the title attribute and one click away on the clipboard.
+   */
+  protected shortId(id: string): string {
+    return id.slice(-12);
+  }
+
+  protected async copyId(id: string): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(id);
+      this.toasts.success('Transaction id copied', id);
+    } catch {
+      // The Clipboard API needs a secure context and a permission that can be refused. The full
+      // id is already on the title attribute, so a failure here costs the user a hover rather
+      // than the information.
+      this.toasts.info('Could not copy automatically', id);
+    }
+  }
 
   /**
    * Active and Pending are the working states; everything else is history.
@@ -160,19 +227,36 @@ export class TransactionList implements OnInit {
   }
 
   /**
-   * Opens the archive confirmation.
+   * Resets every filter to the opening view.
    *
-   * The dialog owns the in flight state and stays open if the archive fails, so the handler
-   * passed here is simply the work to do. The toast fires only on success.
+   * The controls are patched with `emitEvent: false` on purpose. Their valueChanges subscriptions
+   * call setStatus and setPageSize, each of which loads; letting them fire here would race the
+   * single load resetFilters already performs and refetch the same page two more times.
    */
-  protected async askToArchive(transaction: TransactionDto): Promise<void> {
+  protected async clearFilters(): Promise<void> {
+    this.statusFilter.setValue(DEFAULT_STATUS, { emitEvent: false });
+    this.pageSizeControl.setValue(String(DEFAULT_PAGE_SIZE), { emitEvent: false });
+    await this.store.resetFilters();
+  }
+
+  /**
+   * Opens the delete confirmation.
+   *
+   * "Delete" is the user facing word only. `softDelete` below is unchanged: the row transitions
+   * to Inactive and the record is never destroyed (doc 05 section 7). The message still says so,
+   * because a user who deletes something is entitled to know it survives for audit.
+   *
+   * The dialog owns the in flight state and stays open if the call fails, so the handler passed
+   * here is simply the work to do. The toast fires only on success.
+   */
+  protected async askToDelete(transaction: TransactionDto): Promise<void> {
     const data: ConfirmDialogData = {
-      title: 'Archive this transaction?',
+      title: 'Delete this transaction?',
       message:
         `This moves the ${transaction.transactionType} of ${transaction.currencyCode} ` +
         `${transaction.amount} to Inactive. The record is kept for audit, but it cannot be ` +
-        `reactivated from here.`,
-      confirmLabel: 'Archive',
+        `restored from here.`,
+      confirmLabel: 'Delete',
       onConfirm: () => this.store.softDelete(transaction.id),
     };
 
@@ -187,24 +271,24 @@ export class TransactionList implements OnInit {
       // the behaviour did not back up.
       ariaModal: true,
 
-      // Focus starts inside the dialog and returns to the Archive button that opened it.
+      // Focus starts inside the dialog and returns to the Delete button that opened it.
       autoFocus: 'first-tabbable',
       restoreFocus: true,
     });
 
-    const archived = await firstValueFrom(ref.closed);
+    const deleted = await firstValueFrom(ref.closed);
 
-    if (!archived) {
-      // Cancelled or dismissed. The CDK has already put focus back on the Archive button.
+    if (!deleted) {
+      // Cancelled or dismissed. The CDK has already put focus back on the Delete button.
       return;
     }
 
     this.toasts.success(
-      'Transaction archived',
+      'Transaction deleted',
       `${transaction.transactionType} of ${transaction.currencyCode} ${transaction.amount}`,
     );
 
-    // On success the Archive button that opened the dialog no longer exists: the row has left
+    // On success the Delete button that opened the dialog no longer exists: the row has left
     // the Active list. The CDK has nothing to restore focus to and drops it on <body>, which
     // strands a keyboard user at the top of the document. Move focus to the grid instead, so
     // the next Tab continues from where they were working.

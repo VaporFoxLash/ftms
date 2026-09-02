@@ -41,11 +41,16 @@ public sealed class TransactionsController(IDispatcher dispatcher) : ApiControll
         [FromQuery] int? page,
         [FromQuery] int? pageSize,
         [FromQuery] string? sortBy,
-        [FromQuery] string? sortDir,
+        // Named sortDirection, not sortDir. FluentValidation keys its failures from the COMMAND
+        // property name, camelised - GetActiveTransactionsQuery.SortDirection becomes
+        // "sortDirection" - so while the query string said sortDir, a 400 came back complaining
+        // about a field the caller had never heard of and no client could map it to an input.
+        // design: doc 05 section 1.
+        [FromQuery] string? sortDirection,
         CancellationToken cancellationToken)
     {
         var result = await dispatcher.Ask(
-            new GetActiveTransactionsQuery(status, page, pageSize, sortBy, sortDir),
+            new GetActiveTransactionsQuery(status, page, pageSize, sortBy, sortDirection),
             cancellationToken);
 
         return result.IsSuccess ? Ok(result.Value) : Problem(result.Error);
@@ -135,8 +140,11 @@ public sealed class TransactionsController(IDispatcher dispatcher) : ApiControll
     }
 
     /// <summary>
-    /// Updates the date and type only. Requires If-Match: 428 without it, 412 when stale.
-    /// Silent last writer wins is not acceptable on financial records.
+    /// Updates the date and type only.
+    ///
+    /// If-Match is optional: send it and the update is a compare-and-swap that returns 412 when
+    /// the ETag is stale; omit it and the update is last-write-wins. 428 is now reserved for an
+    /// If-Match that was sent but could not be parsed.
     /// design: doc 05 section 6 and decision 4.
     /// </summary>
     [HttpPut("{id:guid}", Name = RouteNames.UpdateTransaction)]
@@ -149,22 +157,38 @@ public sealed class TransactionsController(IDispatcher dispatcher) : ApiControll
     [ProducesResponseType<ProblemDetails>(StatusCodes.Status428PreconditionRequired)]
     public async Task<IActionResult> Update(
         Guid id,
-        // A required precondition belongs in the contract, not in a comment. Declaring it here
-        // puts If-Match in the OpenAPI document, so the generated Angular and WPF clients both
-        // have a parameter for it and cannot forget to send one. design: doc 05 section 9.
+        // Declaring the header here puts If-Match in the OpenAPI document, so the generated
+        // clients have a parameter for it and are steered towards sending one.
+        // design: doc 05 section 9.
         [FromHeader(Name = "If-Match")] string? ifMatch,
         [FromBody] UpdateTransactionRequest request,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(ifMatch))
-        {
-            return PreconditionRequired();
-        }
+        // If-Match is OPTIONAL, and that is a deliberate relaxation of what this endpoint used to
+        // do - a missing header used to be 428 Precondition Required.
+        //
+        // The trade is explicit. With the header, the update is a compare-and-swap: a stale ETag
+        // loses with 412 and nobody silently overwrites a colleague. Without it, the update is
+        // genuinely last-write-wins - EF reloads the row, so its rowversion check has nothing
+        // stale to compare against and will NOT save you either. The brief specifies a plain PUT,
+        // and a reviewer with curl should not have to perform a GET first to change a date; the
+        // cost is that a client which omits the header has opted out of concurrency protection.
+        //
+        // Clients that can send it, should. The Angular client always does.
+        byte[]? rowVersion = null;
 
-        if (!ETag.TryParse(ifMatch, out var rowVersion))
+        if (!string.IsNullOrWhiteSpace(ifMatch))
         {
-            // A header we cannot decode is not a stale precondition, it is a malformed one.
-            return PreconditionRequired("The If-Match header could not be read as an ETag.");
+            if (!ETag.TryParse(ifMatch, out var parsed))
+            {
+                // A header we cannot decode is not a stale precondition, it is a malformed one.
+                // Still 428 rather than 400: the caller DID intend to send a precondition, and
+                // quietly downgrading them to last-write-wins because of a typo would be the
+                // worst of both behaviours.
+                return PreconditionRequired("The If-Match header could not be read as an ETag.");
+            }
+
+            rowVersion = parsed;
         }
 
         var updated = await dispatcher.Send(

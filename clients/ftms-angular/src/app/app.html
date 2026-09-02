@@ -1,9 +1,25 @@
 <a class="skip-link" href="#main">Skip to content</a>
 
 <header class="shell__header">
-  <a class="shell__brand" routerLink="/transactions">
-    <span class="shell__brand-mark">FTMS</span>
-    <span class="shell__brand-name">Financial Transactions</span>
+  <!--
+    Company mark, then system name. G4S is who this belongs to; the system name is what
+    it is. The logo carries no alt text because the link's own name already says where it goes -
+    an alt of "G4S" would make a screen reader announce the destination twice.
+  -->
+  <a class="shell__brand" routerLink="/transactions" aria-label="FTMS home">
+    @if (logoUnavailable()) {
+      <span class="shell__brand-mark">FTMS</span>
+    } @else {
+      <img
+        class="shell__brand-logo"
+        src="g4s-logo.png"
+        alt=""
+        width="743"
+        height="440"
+        (error)="logoUnavailable.set(true)"
+      />
+    }
+    <span class="shell__brand-name">Financial Transactions Management System</span>
   </a>
 
   <nav class="shell__nav" aria-label="Main">
@@ -14,10 +30,10 @@
 
   <div class="shell__account">
     @if (auth.isAuthenticated()) {
-      <span class="shell__user">{{ auth.userName() }}</span>
-      <button type="button" class="button button--link" (click)="signOut()">Sign out</button>
+      <span class="shell__user">{{ auth.displayName() ?? auth.userName() }}</span>
+      <button type="button" class="shell__action" (click)="signOut()">Sign out</button>
     } @else {
-      <a class="button button--link" routerLink="/auth/login">Sign in</a>
+      <a class="shell__action" routerLink="/auth/login">Sign in</a>
     }
   </div>
 </header>

@@ -210,7 +210,13 @@ jobs:
         run: npm ci
 
       - name: Format check
-        run: npx prettier --check "src/**/*.{ts,html,scss}" "e2e/**/*.ts"
+        run: npx prettier --check "src/**/*.{ts,html,scss,css}" "e2e/**/*.ts" "*.ts"
+
+      # Formatting and linting are different gates. Prettier above cannot see an unawaited
+      # promise or a control that no keyboard can reach; ESLint can. Ordered before the tests
+      # for the same reason the whole pipeline is ordered by cost - this is the cheaper signal.
+      - name: Lint
+        run: npm run lint
 
       - name: Unit tests
         run: npm run test:ci
@@ -277,6 +283,25 @@ jobs:
       - name: Run journeys
         working-directory: clients/ftms-angular
         run: npm run e2e
+
+      # The same guard the integration suite has. This journey spent a long time as
+      # test.skip(true, ...) while CI reported green, because a skipped suite and a passing one
+      # are indistinguishable in a summary line. Now a re-skip fails the build.
+      - name: Fail if any journey was skipped
+        working-directory: clients/ftms-angular
+        run: |
+          report=playwright-report/results.json
+          skipped=$(node -p "require('./$report').stats.skipped")
+          expected=$(node -p "require('./$report').stats.expected")
+          echo "journeys expected=$expected skipped=$skipped"
+          if [ "$skipped" != "0" ]; then
+            echo "::error::$skipped end to end journey(s) were skipped. A skipped journey proves nothing."
+            exit 1
+          fi
+          if [ "$expected" = "0" ]; then
+            echo "::error::No end to end journeys ran at all."
+            exit 1
+          fi
 
       - name: Upload Playwright report
         if: always()

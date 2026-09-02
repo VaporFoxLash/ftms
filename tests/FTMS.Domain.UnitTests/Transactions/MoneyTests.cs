@@ -6,7 +6,6 @@ namespace FTMS.Domain.UnitTests.Transactions;
 public class MoneyTests
 {
     [Theory]
-    [InlineData(0)]
     [InlineData(0.01)]
     [InlineData(1500)]
     [InlineData(1500.55)]
@@ -20,13 +19,23 @@ public class MoneyTests
     }
 
     [Theory]
+    [InlineData(0)]
     [InlineData(-0.01)]
     [InlineData(-1)]
     [InlineData(-1500.55)]
-    public void Negative_amounts_are_refused(decimal amount)
+    public void Amounts_that_are_not_positive_are_refused(decimal amount)
     {
-        // design: doc 02 section 3 - CK_Transactions_Amount CHECK (Amount >= 0). Direction is
-        // carried by the transaction type, not by the sign, which keeps reporting simple.
+        // Direction is carried by the transaction type, not by the sign, which keeps reporting
+        // simple - so a negative amount is meaningless here.
+        //
+        // Zero is in this list, and it did not use to be. Money.Create accepted zero while
+        // CreateTransactionValidator required greater than zero, so the two layers disagreed
+        // about what a valid transaction was and which rule you met depended on whether you came
+        // through the API or built the aggregate directly. A transaction that moves no money is
+        // not a transaction; the domain was the layer in the wrong.
+        //
+        // CK_Transactions_Amount stays at >= 0. A database constraint is a backstop against
+        // corruption, not the place to express a business rule the domain already owns.
         var result = Money.Create(amount);
 
         result.IsFailure.ShouldBeTrue();
